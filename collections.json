@@ -1,0 +1,1036 @@
+{
+	"info": {
+		"_postman_id": "api-laravel-collection",
+		"name": "API Laravel - Sistema de Ventas",
+		"description": "Collection completa para la API del sistema de ventas con autenticación, gestión de usuarios, compañías, vendedores, productos, clientes, cotizaciones y ventas.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const responseJson = pm.response.json();",
+									"    if (responseJson.success && responseJson.data.token) {",
+									"        pm.collectionVariables.set('token', responseJson.data.token);",
+									"        pm.test('Token saved successfully', function () {",
+									"            pm.expect(responseJson.data.token).to.not.be.undefined;",
+									"        });",
+									"    }",
+									"}",
+									"",
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has success field', function () {",
+									"    pm.expect(pm.response.json()).to.have.property('success');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": ["{{base_url}}"],
+							"path": ["login"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Empresa Test\",\n  \"email\": \"empresa@test.com\",\n  \"password\": \"password123\",\n  \"password_confirmation\": \"password123\",\n  \"role\": \"company\",\n  \"phone\": \"+1234567890\",\n  \"key_activation\": \"ACTIVATION-KEY-123\",\n  \"rif\": \"J-12345678-9\",\n  \"companyName\": \"Mi Empresa S.A.\",\n  \"contactPerson\": \"Juan Pérez\",\n  \"address\": \"Av. Principal 123\",\n  \"country\": \"Venezuela\",\n  \"province\": \"Distrito Capital\",\n  \"city\": \"Caracas\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/register",
+							"host": ["{{base_url}}"],
+							"path": ["register"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Profile (Me)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/me",
+							"host": ["{{base_url}}"],
+							"path": ["me"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/logout",
+							"host": ["{{base_url}}"],
+							"path": ["logout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👥 Users",
+			"item": [
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": ["{{base_url}}"],
+							"path": ["users"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Nuevo Usuario\",\n  \"email\": \"nuevo@example.com\",\n  \"phone\": \"+1234567890\",\n  \"role\": \"seller\",\n  \"password\": \"password123\",\n  \"password_confirmation\": \"password123\",\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": ["{{base_url}}"],
+							"path": ["users"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/1",
+							"host": ["{{base_url}}"],
+							"path": ["users", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Usuario Actualizado\",\n  \"email\": \"actualizado@example.com\",\n  \"phone\": \"+0987654321\",\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/1",
+							"host": ["{{base_url}}"],
+							"path": ["users", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/1",
+							"host": ["{{base_url}}"],
+							"path": ["users", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🏢 Companies",
+			"item": [
+				{
+					"name": "Get All Companies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/companies",
+							"host": ["{{base_url}}"],
+							"path": ["companies"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Company",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_id\": 1,\n  \"name\": \"Nueva Empresa\",\n  \"description\": \"Descripción de la empresa\",\n  \"address\": \"Dirección de la empresa\",\n  \"phone\": \"+1234567890\",\n  \"email\": \"empresa@example.com\",\n  \"contact\": \"Persona de contacto\",\n  \"serial_no\": \"SERIAL123\",\n  \"status\": \"active\",\n  \"rif\": \"J-98765432-1\",\n  \"key_system_items_id\": \"ACTIVATION-KEY-456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/companies",
+							"host": ["{{base_url}}"],
+							"path": ["companies"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/companies/1",
+							"host": ["{{base_url}}"],
+							"path": ["companies", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Company",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Empresa Actualizada\",\n  \"description\": \"Nueva descripción\",\n  \"address\": \"Nueva dirección\",\n  \"phone\": \"+0987654321\",\n  \"email\": \"actualizada@example.com\",\n  \"contact\": \"Nuevo contacto\",\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/companies/1",
+							"host": ["{{base_url}}"],
+							"path": ["companies", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Company",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/companies/1",
+							"host": ["{{base_url}}"],
+							"path": ["companies", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company Sellers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/companies/1/sellers",
+							"host": ["{{base_url}}"],
+							"path": ["companies", "1", "sellers"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🛍️ Sellers",
+			"item": [
+				{
+					"name": "Get All Sellers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sellers",
+							"host": ["{{base_url}}"],
+							"path": ["sellers"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Seller",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"user_id\": 2,\n  \"company_id\": 1,\n  \"code\": \"SELL-001\",\n  \"description\": \"Vendedor principal\",\n  \"status\": \"active\",\n  \"percent_sales\": 5.0,\n  \"percent_receivable\": 3.0,\n  \"inkeeper\": false,\n  \"user_code\": \"UC001\",\n  \"percent_gerencial_debit_note\": 2.0,\n  \"percent_gerencial_credit_note\": 2.0,\n  \"percent_returned_check\": 1.0,\n  \"seller_status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/sellers",
+							"host": ["{{base_url}}"],
+							"path": ["sellers"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Seller by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sellers/1",
+							"host": ["{{base_url}}"],
+							"path": ["sellers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Seller",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"SELL-001-UPD\",\n  \"description\": \"Vendedor principal actualizado\",\n  \"status\": \"active\",\n  \"percent_sales\": 6.0,\n  \"percent_receivable\": 4.0,\n  \"inkeeper\": true,\n  \"seller_status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/sellers/1",
+							"host": ["{{base_url}}"],
+							"path": ["sellers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Seller",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sellers/1",
+							"host": ["{{base_url}}"],
+							"path": ["sellers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sellers by Company",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sellers/company/1",
+							"host": ["{{base_url}}"],
+							"path": ["sellers", "company", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👤 Customers",
+			"item": [
+				{
+					"name": "Get All Customers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/customers?search=&per_page=20",
+							"host": ["{{base_url}}"],
+							"path": ["customers"],
+							"query": [
+								{
+									"key": "search",
+									"value": ""
+								},
+								{
+									"key": "per_page",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Cliente Ejemplo\",\n  \"email\": \"cliente@example.com\",\n  \"phone\": \"+1234567890\",\n  \"document_number\": \"12345678\",\n  \"address\": \"Dirección del cliente\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customers",
+							"host": ["{{base_url}}"],
+							"path": ["customers"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Customer by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Customer",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Cliente Actualizado\",\n  \"email\": \"actualizado@example.com\",\n  \"phone\": \"+0987654321\",\n  \"document_number\": \"87654321\",\n  \"address\": \"Nueva dirección del cliente\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Customer",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/customers/1",
+							"host": ["{{base_url}}"],
+							"path": ["customers", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Products",
+			"item": [
+				{
+					"name": "Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products?search=&category_id=&low_stock=false&per_page=20",
+							"host": ["{{base_url}}"],
+							"path": ["products"],
+							"query": [
+								{
+									"key": "search",
+									"value": ""
+								},
+								{
+									"key": "category_id",
+									"value": ""
+								},
+								{
+									"key": "low_stock",
+									"value": "false"
+								},
+								{
+									"key": "per_page",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Producto Ejemplo\",\n  \"code\": \"PROD-001\",\n  \"price\": 29.99,\n  \"category_id\": 1,\n  \"stock\": 100,\n  \"description\": \"Descripción del producto\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products",
+							"host": ["{{base_url}}"],
+							"path": ["products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Product by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/1",
+							"host": ["{{base_url}}"],
+							"path": ["products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Producto Actualizado\",\n  \"code\": \"PROD-001-UPD\",\n  \"price\": 35.99,\n  \"category_id\": 1,\n  \"stock\": 80,\n  \"description\": \"Descripción actualizada del producto\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/products/1",
+							"host": ["{{base_url}}"],
+							"path": ["products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/products/1",
+							"host": ["{{base_url}}"],
+							"path": ["products", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📋 Quotes",
+			"item": [
+				{
+					"name": "Get All Quotes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes?status=&date_from=&date_to=&user_id=&customer_id=&expired=&per_page=20",
+							"host": ["{{base_url}}"],
+							"path": ["quotes"],
+							"query": [
+								{
+									"key": "status",
+									"value": ""
+								},
+								{
+									"key": "date_from",
+									"value": ""
+								},
+								{
+									"key": "date_to",
+									"value": ""
+								},
+								{
+									"key": "user_id",
+									"value": ""
+								},
+								{
+									"key": "customer_id",
+									"value": ""
+								},
+								{
+									"key": "expired",
+									"value": ""
+								},
+								{
+									"key": "per_page",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Quote",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_id\": 1,\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity\": 2,\n      \"unit_price\": 29.99,\n      \"discount\": 0\n    },\n    {\n      \"product_id\": 2,\n      \"quantity\": 1,\n      \"unit_price\": 15.50,\n      \"discount\": 2.00\n    }\n  ],\n  \"discount\": 5.00,\n  \"valid_until\": \"2024-12-31\",\n  \"terms_conditions\": \"Términos y condiciones del presupuesto\",\n  \"notes\": \"Notas adicionales\",\n  \"metadata\": {\n    \"source\": \"web\",\n    \"priority\": \"normal\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/quotes",
+							"host": ["{{base_url}}"],
+							"path": ["quotes"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Quote by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes/1",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Quote",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_id\": 1,\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity\": 3,\n      \"unit_price\": 29.99,\n      \"discount\": 0\n    }\n  ],\n  \"discount\": 10.00,\n  \"valid_until\": \"2024-12-31\",\n  \"terms_conditions\": \"Términos actualizados\",\n  \"notes\": \"Notas actualizadas\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/quotes/1",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Quote",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes/1",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Quote",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes/1/send",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1", "send"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Quote",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes/1/approve",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1", "approve"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reject Quote",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes/1/reject",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1", "reject"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Duplicate Quote",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/quotes/1/duplicate",
+							"host": ["{{base_url}}"],
+							"path": ["quotes", "1", "duplicate"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "💰 Sales",
+			"item": [
+				{
+					"name": "Get All Sales",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sales?status=&date_from=&date_to=&user_id=&per_page=20",
+							"host": ["{{base_url}}"],
+							"path": ["sales"],
+							"query": [
+								{
+									"key": "status",
+									"value": ""
+								},
+								{
+									"key": "date_from",
+									"value": ""
+								},
+								{
+									"key": "date_to",
+									"value": ""
+								},
+								{
+									"key": "user_id",
+									"value": ""
+								},
+								{
+									"key": "per_page",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Sale",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_id\": 1,\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity\": 2,\n      \"unit_price\": 29.99,\n      \"discount\": 0\n    },\n    {\n      \"product_id\": 2,\n      \"quantity\": 1,\n      \"unit_price\": 15.50,\n      \"discount\": 1.50\n    }\n  ],\n  \"discount\": 5.00,\n  \"payment_method\": \"cash\",\n  \"notes\": \"Venta realizada en efectivo\",\n  \"metadata\": {\n    \"cashier\": \"Juan Pérez\",\n    \"location\": \"Tienda Principal\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/sales",
+							"host": ["{{base_url}}"],
+							"path": ["sales"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sale by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/sales/1",
+							"host": ["{{base_url}}"],
+							"path": ["sales", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Sale",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"completed\",\n  \"payment_status\": \"paid\",\n  \"notes\": \"Venta completada y pagada\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/sales/1",
+							"host": ["{{base_url}}"],
+							"path": ["sales", "1"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Dashboard",
+			"item": [
+				{
+					"name": "Get Dashboard Data",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/dashboard",
+							"host": ["{{base_url}}"],
+							"path": ["dashboard"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔄 Sync",
+			"item": [
+				{
+					"name": "Sync Products",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Last-Sync",
+								"value": "2024-01-01T00:00:00Z",
+								"description": "Fecha de última sincronización"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/sync/products",
+							"host": ["{{base_url}}"],
+							"path": ["sync", "products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Last-Sync",
+								"value": "2024-01-01T00:00:00Z",
+								"description": "Fecha de última sincronización"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/sync/customers",
+							"host": ["{{base_url}}"],
+							"path": ["sync", "customers"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Quotes for Sync",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Last-Sync",
+								"value": "2024-01-01T00:00:00Z",
+								"description": "Fecha de última sincronización"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/sync/quotes",
+							"host": ["{{base_url}}"],
+							"path": ["sync", "quotes"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Quotes from Offline",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"quotes\": [\n    {\n      \"offline_id\": \"OFFLINE-001\",\n      \"customer_id\": 1,\n      \"subtotal\": 100.00,\n      \"tax\": 18.00,\n      \"total\": 118.00,\n      \"status\": \"draft\",\n      \"quote_date\": \"2024-01-15\",\n      \"valid_until\": \"2024-02-15\",\n      \"terms_conditions\": \"Términos offline\",\n      \"notes\": \"Creado offline\",\n      \"items\": [\n        {\n          \"product_id\": 1,\n          \"quantity\": 2,\n          \"unit_price\": 50.00,\n          \"total_price\": 100.00,\n          \"discount\": 0\n        }\n      ]\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/sync/quotes",
+							"host": ["{{base_url}}"],
+							"path": ["sync", "quotes"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Script que se ejecuta antes de cada request",
+					"// Aquí puedes añadir lógica global si es necesaria"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Tests globales que se ejecutan después de cada request",
+					"pm.test('Response time is less than 2000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(2000);",
+					"});",
+					"",
+					"pm.test('Response has valid JSON', function () {",
+					"    pm.response.to.have.jsonBody();",
+					"});",
+					"",
+					"// Log de la respuesta para debugging",
+					"if (pm.response.code >= 400) {",
+					"    console.log('Error Response:', pm.response.json());",
+					"}"
+				]
+			}
+		}
+	]
+}

@@ -50,7 +50,7 @@ return new class extends Migration
             // Claves foráneas
             $table->foreign('quote_id')->references('id')->on('quotes')->onDelete('cascade');
             // Nota: La clave foránea para product_id se puede agregar si tienes tabla products
-            // $table->foreign('product_id')->references('id')->on('products')->onDelete('set null');
+            $table->foreign('product_id')->references('id')->on('products')->onDelete('set null');
         });
     }
 

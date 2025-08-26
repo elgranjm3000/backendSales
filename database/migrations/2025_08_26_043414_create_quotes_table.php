@@ -19,7 +19,7 @@ return new class extends Migration
             
             // Referencias a otras tablas
             $table->unsignedBigInteger('customer_id')->comment('ID del cliente');
-            $table->unsignedBigInteger('user_id')->comment('ID del usuario que creó la cotización');
+            $table->unsignedBigInteger('company_id')->comment('ID de la compañía asociada');
             
             // Campos monetarios
             $table->decimal('subtotal', 15, 2)->default(0)->comment('Subtotal sin impuestos ni descuentos');
@@ -50,14 +50,13 @@ return new class extends Migration
             
             // Índices para mejorar el rendimiento
             $table->index(['customer_id', 'status']);
-            $table->index(['user_id', 'quote_date']);
             $table->index(['status', 'valid_until']);
             $table->index('quote_date');
             $table->index('valid_until');
-            
+            $table->index('company_id');
             // Claves foráneas
             $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
         });
     }
 

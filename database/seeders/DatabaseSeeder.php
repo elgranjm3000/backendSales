@@ -18,6 +18,8 @@ class DatabaseSeeder extends Seeder
             KeySystemItemSeeder::class, // Claves de activación
             //CompanySeeder::class,   // Segundo compañías (dependen de usuarios)
             SellerSeeder::class,
+            CategorySeeder::class,  // Categorías
+            ProductSeeder::class,   // Productos (dependen de categorías)
             
         ]);
     }

@@ -31,9 +31,8 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::with('companies')->where('email', $request->email)->first();
 
-        $user->load('companies');
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([

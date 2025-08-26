@@ -10,7 +10,7 @@ class Quote extends Model
     use HasFactory;
 
     protected $fillable = [
-        'quote_number', 'customer_id', 'user_id', 'subtotal', 'tax',
+        'quote_number', 'customer_id', 'company_id', 'subtotal', 'tax',
         'discount', 'total', 'status', 'notes', 'quote_date', 'valid_until',
         'terms_conditions', 'sent_at', 'approved_at', 'metadata'
     ];
@@ -39,9 +39,9 @@ class Quote extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    public function user()
+    public function company()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Company::class);
     }
 
     public function items()
