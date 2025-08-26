@@ -7,6 +7,8 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use App\Models\KeySystemItem;
 
 class CompanyController extends Controller
 {
@@ -68,6 +70,8 @@ class CompanyController extends Controller
             'contact' => 'nullable|string|max:255',
             'serial_no' => 'nullable|string|max:100',
             'status' => 'sometimes|in:active,inactive',
+            'rif' => 'required|string|max:20|unique:companies,rif',
+            'key_system_items_id' => 'sometimes|string',
         ]);
 
         if ($validator->fails()) {
@@ -75,6 +79,15 @@ class CompanyController extends Controller
                 'success' => false,
                 'message' => 'Datos de validación incorrectos',
                 'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $keyactivate = KeySystemItem::where('key_activation', $request->key_system_items_id)->first();
+
+        if (!$keyactivate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Clave de activación inválida'
             ], 422);
         }
 
@@ -110,6 +123,8 @@ class CompanyController extends Controller
             'contact' => $request->contact,
             'serial_no' => $request->serial_no,
             'status' => $request->status ?? Company::STATUS_ACTIVE,
+            'rif' => $request->rif,
+            'key_system_items_id'=> $keyactivate->id,
         ]);
 
         $company->load('user:id,name,email');

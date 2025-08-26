@@ -24,13 +24,14 @@ class Company extends Model
         'logo_type',
         'email',
         'contact',
-        'key_activation',
+        'key_system_items_id',
         'serial_no',
         'restaurant_image',
         'restaurant_image_type',
         'main_image',
         'main_image_type',
         'status',
+        'rif'
     ];
 
     /**

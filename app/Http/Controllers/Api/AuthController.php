@@ -33,6 +33,8 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
+        $user->load('companies');
+
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
@@ -59,6 +61,12 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role' => $user->role,
                     'status' => $user->status,
+                    'companies' => $user->companies->map(function ($company) {
+                        return [
+                            'id' => $company->id,
+                            'name' => $company->name,                           
+                        ];
+                    }),
                 ],
                 'token' => $token
             ]
@@ -137,7 +145,7 @@ class AuthController extends Controller
         if (!$keyactivate) {
             return response()->json([
                 'success' => false,
-                'message' => 'Clave de activación inválida o la compañía no está activa'
+                'message' => 'Clave de activación inválida'
             ], 422);
         }
 
