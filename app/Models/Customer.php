@@ -20,9 +20,9 @@ class Customer extends Model
         'longitude' => 'decimal:8'
     ];
 
-    public function sales()
+    public function quotes() // Cambio de sales a quotes
     {
-        return $this->hasMany(Sale::class);
+        return $this->hasMany(Quote::class);
     }
 
     public function scopeActive($query)
@@ -30,8 +30,19 @@ class Customer extends Model
         return $query->where('status', 'active');
     }
 
-    public function getTotalPurchasesAttribute()
+    public function getTotalQuotesValueAttribute() // Cambio de purchases a quotes
     {
-        return $this->sales()->where('status', 'completed')->sum('total');
+        return $this->quotes()->whereIn('status', ['approved'])->sum('total');
+    }
+
+    public function getQuotesCountAttribute()
+    {
+        return $this->quotes()->count();
+    }
+
+    public function getApprovedQuotesCountAttribute()
+    {
+        return $this->quotes()->where('status', 'approved')->count();
     }
 }
+

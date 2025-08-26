@@ -17,7 +17,7 @@ class CustomerController extends Controller
                   ->orWhere('phone', 'like', '%' . $request->search . '%');
         }
 
-        $customers = $query->withCount('sales')
+        $customers = $query->withCount('quotes')
                           ->paginate($request->per_page ?? 20);
 
         return response()->json($customers);
@@ -40,7 +40,7 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        return response()->json($customer->load('sales'));
+        return response()->json($customer->load('quotes'));
     }
 
     public function update(Request $request, Customer $customer)

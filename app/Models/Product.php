@@ -26,9 +26,9 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
-    public function saleItems()
+    public function quoteItems() // Cambio de saleItems a quoteItems
     {
-        return $this->hasMany(SaleItem::class);
+        return $this->hasMany(QuoteItem::class);
     }
 
     public function scopeActive($query)
@@ -40,4 +40,10 @@ class Product extends Model
     {
         return $query->whereColumn('stock', '<=', 'min_stock');
     }
+
+    public function getTimesQuotedAttribute()
+    {
+        return $this->quoteItems()->sum('quantity');
+    }
 }
+

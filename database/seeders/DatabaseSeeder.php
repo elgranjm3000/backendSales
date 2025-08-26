@@ -14,11 +14,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,
-            CategorySeeder::class,
-            ProductSeeder::class,
-            CustomerSeeder::class,
-            SaleSeeder::class,
+            UserSeeder::class,      // Primero usuarios (sin dependencias)
+            KeySystemItemSeeder::class, // Claves de activación
+            //CompanySeeder::class,   // Segundo compañías (dependen de usuarios)
+            SellerSeeder::class,
+            
         ]);
     }
 }

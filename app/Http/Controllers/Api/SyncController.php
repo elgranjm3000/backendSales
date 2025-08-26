@@ -1,10 +1,11 @@
 <?php
+// app/Http/Controllers/Api/SyncController.php
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Customer;
-use App\Models\Sale;
+use App\Models\Quote;
 use App\Models\SyncLog;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -61,53 +62,111 @@ class SyncController extends Controller
         ]);
     }
 
-    public function syncSales(Request $request)
+    public function syncQuotes(Request $request)
     {
         $request->validate([
-            'sales' => 'required|array',
-            'sales.*.offline_id' => 'required|string',
-            'sales.*.customer_id' => 'required|exists:customers,id',
-            'sales.*.items' => 'required|array'
+            'quotes' => 'required|array',
+            'quotes.*.offline_id' => 'required|string',
+            'quotes.*.customer_id' => 'required|exists:customers,id',
+            'quotes.*.items' => 'required|array',
+            'quotes.*.status' => 'nullable|in:draft,sent,approved,rejected',
+            'quotes.*.valid_until' => 'nullable|date'
         ]);
 
-        $syncedSales = [];
+        $syncedQuotes = [];
         
-        foreach ($request->sales as $saleData) {
+        foreach ($request->quotes as $quoteData) {
             try {
-                $sale = Sale::create([
-                    'customer_id' => $saleData['customer_id'],
+                $quote = Quote::create([
+                    'customer_id' => $quoteData['customer_id'],
                     'user_id' => auth()->id(),
-                    'subtotal' => $saleData['subtotal'],
-                    'tax' => $saleData['tax'],
-                    'total' => $saleData['total'],
-                    'payment_method' => $saleData['payment_method'] ?? 'cash',
-                    'payment_status' => 'paid',
-                    'status' => 'completed',
-                    'sale_date' => $saleData['sale_date'] ?? now(),
-                    'notes' => $saleData['notes'] ?? null,
-                    'metadata' => ['offline_id' => $saleData['offline_id']]
+                    'subtotal' => $quoteData['subtotal'],
+                    'tax' => $quoteData['tax'],
+                    'total' => $quoteData['total'],
+                    'status' => $quoteData['status'] ?? Quote::STATUS_DRAFT,
+                    'quote_date' => $quoteData['quote_date'] ?? now(),
+                    'valid_until' => $quoteData['valid_until'] ?? now()->addDays(30)->toDateString(),
+                    'terms_conditions' => $quoteData['terms_conditions'] ?? null,
+                    'notes' => $quoteData['notes'] ?? null,
+                    'metadata' => ['offline_id' => $quoteData['offline_id']]
                 ]);
 
-                foreach ($saleData['items'] as $item) {
-                    $sale->items()->create($item);
+                foreach ($quoteData['items'] as $item) {
+                    $quote->items()->create([
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'total_price' => $item['total_price'],
+                        'discount' => $item['discount'] ?? 0
+                    ]);
                 }
 
-                $syncedSales[] = [
-                    'offline_id' => $saleData['offline_id'],
-                    'server_id' => $sale->id,
-                    'sale_number' => $sale->sale_number
+                $syncedQuotes[] = [
+                    'offline_id' => $quoteData['offline_id'],
+                    'server_id' => $quote->id,
+                    'quote_number' => $quote->quote_number,
+                    'status' => 'success'
                 ];
 
             } catch (\Exception $e) {
-                $syncedSales[] = [
-                    'offline_id' => $saleData['offline_id'],
-                    'error' => $e->getMessage()
+                $syncedQuotes[] = [
+                    'offline_id' => $quoteData['offline_id'],
+                    'error' => $e->getMessage(),
+                    'status' => 'error'
                 ];
             }
         }
 
+        SyncLog::create([
+            'user_id' => auth()->id(),
+            'entity_type' => 'quotes',
+            'action' => 'sync',
+            'data' => [
+                'total_quotes' => count($request->quotes),
+                'successful' => count(array_filter($syncedQuotes, fn($q) => $q['status'] === 'success')),
+                'failed' => count(array_filter($syncedQuotes, fn($q) => $q['status'] === 'error'))
+            ],
+            'synced_at' => now()
+        ]);
+
         return response()->json([
-            'synced_sales' => $syncedSales,
+            'synced_quotes' => $syncedQuotes,
+            'sync_time' => now()->toISOString(),
+            'summary' => [
+                'total' => count($syncedQuotes),
+                'successful' => count(array_filter($syncedQuotes, fn($q) => $q['status'] === 'success')),
+                'failed' => count(array_filter($syncedQuotes, fn($q) => $q['status'] === 'error'))
+            ]
+        ]);
+    }
+
+    public function getQuotes(Request $request)
+    {
+        $lastSync = $request->header('Last-Sync');
+        $query = Quote::with(['customer', 'items.product']);
+        
+        if ($lastSync) {
+            $query->where('updated_at', '>', Carbon::parse($lastSync));
+        }
+        
+        // Solo sincronizar presupuestos del usuario autenticado o todos si es admin
+        $user = auth()->user();
+        if ($user->role !== 'admin') {
+            $query->where('user_id', $user->id);
+        }
+        
+        $quotes = $query->orderBy('quote_date', 'desc')->get();
+        
+        SyncLog::create([
+            'user_id' => auth()->id(),
+            'entity_type' => 'quotes',
+            'action' => 'download',
+            'data' => ['count' => $quotes->count()],
+            'synced_at' => now()
+        ]);
+
+        return response()->json([
+            'quotes' => $quotes,
             'sync_time' => now()->toISOString()
         ]);
     }

@@ -11,13 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sync_logs', function (Blueprint $table) {
+        Schema::create('key_system_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('entity_type'); // products, customers, sales
-            $table->string('action'); // create, update, delete, sync
-            $table->json('data');
-            $table->timestamp('synced_at');
+            $table->string('key_activation')->nullable()->comment('Clave de activación');
             $table->timestamps();
         });
     }
@@ -27,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sync_logs_tokens');
+        Schema::dropIfExists('key_system_items');
     }
 };

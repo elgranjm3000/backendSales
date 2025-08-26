@@ -1,15 +1,16 @@
 <?php
+// app/Models/QuoteItem.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class SaleItem extends Model
+class QuoteItem extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'sale_id', 'product_id', 'quantity', 'unit_price', 'total_price', 'discount'
+        'quote_id', 'product_id', 'quantity', 'unit_price', 'total_price', 'discount'
     ];
 
     protected $casts = [
@@ -18,9 +19,9 @@ class SaleItem extends Model
         'discount' => 'decimal:2'
     ];
 
-    public function sale()
+    public function quote()
     {
-        return $this->belongsTo(Sale::class);
+        return $this->belongsTo(Quote::class);
     }
 
     public function product()
