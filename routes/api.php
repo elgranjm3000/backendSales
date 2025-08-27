@@ -5,9 +5,11 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\SellerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\QuoteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -107,6 +109,27 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Vendedores de una compañía específica
     });
+
+    Route::prefix('quotes')->group(function () {
+        Route::get('/', [QuoteController::class, 'index']);
+        Route::post('/', [QuoteController::class, 'store']);
+        Route::get('{id}', [QuoteController::class, 'show']);
+        Route::put('{id}', [QuoteController::class, 'update']);
+        Route::delete('{id}', [QuoteController::class, 'destroy']);
+        
+        // Vendedores de una compañía específica
+    });
+
+    Route::prefix('customers')->group(function () {
+        Route::get('/', [CustomerController::class, 'index']);
+        Route::post('/', [CustomerController::class, 'store']);
+        Route::get('{id}', [CustomerController::class, 'show']);
+        Route::put('{id}', [CustomerController::class, 'update']);
+        Route::delete('{id}', [CustomerController::class, 'destroy']);
+        
+        // Vendedores de una compañía específica
+    });
+
     // Rutas de compañías
     Route::prefix('companies')->group(function () {
         Route::get('/', [CompanyController::class, 'index']);

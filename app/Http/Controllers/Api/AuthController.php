@@ -121,19 +121,39 @@ class AuthController extends Controller
             'status' => 'sometimes|in:active,inactive',
             'key_activation' => 'required|string', 
             'phone' => 'sometimes|nullable|string|max:20',
-            'rif' => 'required|string|max:20|unique:companies,rif',
-            'companyName' => 'required|string|max:255',
-            'contactPerson' => 'required|string|max:255',
-            'address' => 'required|string|max:500',
-            'country' => 'required|string|max:100',
-            'province' => 'required|string|max:100',
-            'city' => 'required|string|max:100',            
-        ]);
+            'rif' => 'required|string|max:20|unique:companies,rif',                 
+        ], [
+                // Mensajes personalizados por campo y regla
+                'email.required' => 'El correo electrónico es obligatorio.',
+                'email.email' => 'Debes ingresar un correo válido.',
+                'email.unique' => 'Este correo ya está registrado.',
+                'email.max' => 'El correo no puede exceder los 255 caracteres.',
 
+                'name.required' => 'El nombre es obligatorio.',
+                'name.max' => 'El nombre no puede exceder los 255 caracteres.',
+
+                'role.required' => 'El rol es obligatorio.',
+                'role.in' => 'El rol debe ser "company".',
+
+                'password.required' => 'La contraseña es obligatoria.',
+                'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
+                'password.confirmed' => 'Las contraseñas no coinciden.',
+
+                'status.in' => 'El estado debe ser "active" o "inactive".',
+
+                'key_activation.required' => 'La clave de activación es obligatoria.',
+
+                'phone.max' => 'El número de teléfono no puede exceder los 20 caracteres.',
+
+                'rif.required' => 'El RIF es obligatorio.',
+                'rif.max' => 'El RIF no puede exceder los 20 caracteres.',
+                'rif.unique' => 'Este RIF ya está registrado en otra empresa.',
+        ]);
+        $message = implode(' | ', $validator->errors()->all());
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Datos de validación incorrectos',
+                'message' => $message,
                 'errors' => $validator->errors()
             ], 422);
         }

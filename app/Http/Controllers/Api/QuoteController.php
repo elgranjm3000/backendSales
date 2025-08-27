@@ -41,15 +41,7 @@ class QuoteController extends Controller
         // Filtros adicionales
         if ($request->has('status')) {
             $query->where('status', $request->status);
-        }
-
-        if ($request->has('date_from')) {
-            $query->whereDate('quote_date', '>=', $request->date_from);
-        }
-
-        if ($request->has('date_to')) {
-            $query->whereDate('quote_date', '<=', $request->date_to);
-        }
+        }      
 
         
 
