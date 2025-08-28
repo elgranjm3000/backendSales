@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class SellerController extends Controller
 {
@@ -50,7 +52,7 @@ class SellerController extends Controller
     }
 
     /**
-     * Crear nuevo vendedor
+     * Crear nuevo vendedor (crea nuevo usuario seller)
      */
     public function store(Request $request)
     {
@@ -65,7 +67,13 @@ class SellerController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
+            // Datos del usuario seller que se va a crear
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'phone' => 'nullable|string|max:20',
+            'password' => 'required|string|min:8|confirmed',
+            
+            // Datos del seller
             'company_id' => 'required|exists:companies,id',
             'code' => 'required|string|max:50|unique:sellers,code',
             'description' => 'nullable|string',
@@ -85,15 +93,6 @@ class SellerController extends Controller
                 'success' => false,
                 'message' => 'Datos de validación incorrectos',
                 'errors' => $validator->errors()
-            ], 422);
-        }
-
-        // Verificar que el usuario tenga rol seller
-        $sellerUser = User::find($request->user_id);
-        if ($sellerUser->role === User::ROLE_SELLER) {
-            return response()->json([
-                'success' => false,
-                'message' => 'El usuario no debe tener rol de seller'
             ], 422);
         }
 
@@ -118,41 +117,54 @@ class SellerController extends Controller
             ], 403);
         }
 
-        // Verificar que el usuario no sea ya vendedor en esta compañía
-        $existingSeller = Seller::where('user_id', $request->user_id)
-                                ->where('company_id', $request->company_id)
-                                ->first();
+        try {
+            DB::beginTransaction();
 
-        if ($existingSeller) {
+            // 1. Crear el usuario con rol seller
+            $sellerUser = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => Hash::make($request->password),
+                'role' => User::ROLE_SELLER,
+                'status' => User::STATUS_ACTIVE,
+            ]);
+
+            // 2. Crear el registro de vendedor asociado al usuario
+            $seller = Seller::create([
+                'user_id' => $sellerUser->id,
+                'company_id' => $request->company_id,
+                'code' => $request->code,
+                'description' => $request->description,
+                'status' => $request->status,
+                'percent_sales' => $request->percent_sales ?? 0,
+                'percent_receivable' => $request->percent_receivable ?? 0,
+                'inkeeper' => $request->inkeeper ?? false,
+                'user_code' => $request->user_code,
+                'percent_gerencial_debit_note' => $request->percent_gerencial_debit_note ?? 0,
+                'percent_gerencial_credit_note' => $request->percent_gerencial_credit_note ?? 0,
+                'percent_returned_check' => $request->percent_returned_check ?? 0,
+                'seller_status' => $request->seller_status ?? Seller::STATUS_ACTIVE,
+            ]);
+
+            DB::commit();
+
+            $seller->load(['user:id,name,email,role', 'company:id,name']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vendedor creado exitosamente',
+                'data' => $seller
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            
             return response()->json([
                 'success' => false,
-                'message' => 'El usuario ya es vendedor en esta compañía'
-            ], 422);
+                'message' => 'Error al crear el vendedor: ' . $e->getMessage()
+            ], 500);
         }
-
-        $seller = Seller::create([
-            'user_id' => $request->user_id,
-            'company_id' => $request->company_id,
-            'code' => $request->code,
-            'description' => $request->description,
-            'status' => $request->status,
-            'percent_sales' => $request->percent_sales ?? 0,
-            'percent_receivable' => $request->percent_receivable ?? 0,
-            'inkeeper' => $request->inkeeper ?? false,
-            'user_code' => $request->user_code,
-            'percent_gerencial_debit_note' => $request->percent_gerencial_debit_note ?? 0,
-            'percent_gerencial_credit_note' => $request->percent_gerencial_credit_note ?? 0,
-            'percent_returned_check' => $request->percent_returned_check ?? 0,
-            'seller_status' => $request->seller_status ?? Seller::STATUS_ACTIVE,
-        ]);
-
-        $seller->load(['user:id,name,email', 'company:id,name']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Vendedor creado exitosamente',
-            'data' => $seller
-        ], 201);
     }
 
     /**
@@ -161,7 +173,7 @@ class SellerController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        $seller = Seller::with(['user:id,name,email', 'company:id,name'])->find($id);
+        $seller = Seller::with(['user:id,name,email,role', 'company:id,name'])->find($id);
 
         if (!$seller) {
             return response()->json([
@@ -204,7 +216,7 @@ class SellerController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user();
-        $seller = Seller::find($id);
+        $seller = Seller::with(['company', 'user'])->find($id);
 
         if (!$seller) {
             return response()->json([
@@ -233,6 +245,13 @@ class SellerController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            // Datos del usuario
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|string|email|max:255|unique:users,email,' . $seller->user->id,
+            'phone' => 'sometimes|nullable|string|max:20',
+            'password' => 'sometimes|nullable|string|min:8|confirmed',
+            
+            // Datos del seller
             'code' => 'sometimes|string|max:50|unique:sellers,code,' . $seller->id,
             'description' => 'sometimes|nullable|string',
             'status' => 'sometimes|nullable|string|max:50',
@@ -254,29 +273,58 @@ class SellerController extends Controller
             ], 422);
         }
 
-        $updateData = $request->only([
-            'code', 'description', 'status', 'percent_sales', 'percent_receivable',
-            'inkeeper', 'user_code', 'percent_gerencial_debit_note',
-            'percent_gerencial_credit_note', 'percent_returned_check', 'seller_status'
-        ]);
+        try {
+            DB::beginTransaction();
 
-        $seller->update($updateData);
-        $seller->load(['user:id,name,email', 'company:id,name']);
+            // Actualizar datos del usuario si se proporcionan
+            $userUpdateData = [];
+            if ($request->has('name')) $userUpdateData['name'] = $request->name;
+            if ($request->has('email')) $userUpdateData['email'] = $request->email;
+            if ($request->has('phone')) $userUpdateData['phone'] = $request->phone;
+            if ($request->filled('password')) $userUpdateData['password'] = Hash::make($request->password);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Vendedor actualizado exitosamente',
-            'data' => $seller
-        ]);
+            if (!empty($userUpdateData)) {
+                $seller->user->update($userUpdateData);
+            }
+
+            // Actualizar datos del seller
+            $sellerUpdateData = $request->only([
+                'code', 'description', 'status', 'percent_sales', 'percent_receivable',
+                'inkeeper', 'user_code', 'percent_gerencial_debit_note',
+                'percent_gerencial_credit_note', 'percent_returned_check', 'seller_status'
+            ]);
+
+            if (!empty($sellerUpdateData)) {
+                $seller->update($sellerUpdateData);
+            }
+
+            DB::commit();
+
+            $seller->load(['user:id,name,email,role', 'company:id,name']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vendedor actualizado exitosamente',
+                'data' => $seller
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar el vendedor: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * Eliminar vendedor
+     * Eliminar vendedor (elimina usuario y seller)
      */
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        $seller = Seller::find($id);
+        $seller = Seller::with(['company', 'user'])->find($id);
 
         if (!$seller) {
             return response()->json([
@@ -289,8 +337,6 @@ class SellerController extends Controller
         $canDelete = false;
         switch ($user->role) {
             case User::ROLE_ADMIN:
-                $canDelete = true;
-                break;
             case User::ROLE_MANAGER:
                 $canDelete = true;
                 break;
@@ -306,12 +352,32 @@ class SellerController extends Controller
             ], 403);
         }
 
-        $seller->delete();
+        try {
+            DB::beginTransaction();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Vendedor eliminado exitosamente'
-        ]);
+            $sellerUser = $seller->user;
+            
+            // Eliminar el registro de vendedor (esto eliminará automáticamente el usuario por la foreign key cascade)
+            $seller->delete();
+            
+            // Si quieres eliminar también el usuario (opcional, según tu lógica de negocio)
+            // $sellerUser->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vendedor eliminado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar el vendedor: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -349,7 +415,7 @@ class SellerController extends Controller
         }
 
         $sellers = Seller::where('company_id', $companyId)
-                         ->with('user:id,name,email')
+                         ->with('user:id,name,email,role')
                          ->paginate(15);
 
         return response()->json([
