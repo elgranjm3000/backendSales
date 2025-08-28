@@ -158,8 +158,9 @@ class QuoteController extends Controller
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
-                    'total_price' => $item['quantity'] * $item['unit_price'],
-                    'discount' => $item['discount'] ?? 0
+                    'total' => $item['quantity'] * $item['unit_price'],
+                    'discount_amount' => $item['discount'] ?? 0,
+                    'name' => $item['name'] ?? null,
                 ]);
             }
 
@@ -180,9 +181,12 @@ class QuoteController extends Controller
         }
     }
 
-    public function show(Request $request, Quote $quote)
+    public function show($id)
     {
         $user = auth()->user();
+        $quote = Quote::with(['customer', 'company', 'items.product'])->find($id);        
+        $canView = $user->companies->contains($quote->company_id);
+       
 
         // Verificar permisos
         $canView = false;

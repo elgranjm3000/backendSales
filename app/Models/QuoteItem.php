@@ -10,7 +10,7 @@ class QuoteItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'quote_id', 'product_id', 'quantity', 'unit_price', 'total_price', 'discount'
+        'quote_id', 'product_id', 'quantity', 'unit_price', 'total_price', 'discount','name'
     ];
 
     protected $casts = [
