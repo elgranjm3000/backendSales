@@ -29,8 +29,8 @@ class SellerController extends Controller
                 break;
             case User::ROLE_COMPANY:
                 // Company solo puede ver vendedores de sus compañías
-                $companyIds = $user->companies->pluck('id');
-                $query->whereIn('company_id', $companyIds);
+                $companyIds = $user->companies->pluck('id');                
+                $query->whereIn('company_id', $request->company_id ? [$request->company_id] : $companyIds);
                 break;
             case User::ROLE_SELLER:
                 // Seller solo puede ver sus propios registros
@@ -87,11 +87,12 @@ class SellerController extends Controller
             'percent_returned_check' => 'nullable|numeric|min:0|max:100',
             'seller_status' => 'sometimes|in:active,inactive',
         ]);
+        $message = implode(' | ', $validator->errors()->all());
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Datos de validación incorrectos',
+                'message' =>  $message,
                 'errors' => $validator->errors()
             ], 422);
         }
