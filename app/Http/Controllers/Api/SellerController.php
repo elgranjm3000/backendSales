@@ -90,10 +90,10 @@ class SellerController extends Controller
 
         // Verificar que el usuario tenga rol seller
         $sellerUser = User::find($request->user_id);
-        if ($sellerUser->role !== User::ROLE_SELLER) {
+        if ($sellerUser->role === User::ROLE_SELLER) {
             return response()->json([
                 'success' => false,
-                'message' => 'El usuario debe tener rol de seller'
+                'message' => 'El usuario no debe tener rol de seller'
             ], 422);
         }
 
