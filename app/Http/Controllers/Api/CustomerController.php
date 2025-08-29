@@ -1,66 +1,155 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Mostrar lista de clientes
+     */
+    public function index(Request $request): JsonResponse
     {
-        $query = Customer::active();
-        
-        if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('email', 'like', '%' . $request->search . '%')
-                  ->orWhere('phone', 'like', '%' . $request->search . '%');
+        $query = Customer::with('company')
+            ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
+            ->when($request->status, fn($q) => $q->where('status', $request->status))
+            ->when($request->search, function ($q) use ($request) {
+                $q->where(function ($query) use ($request) {
+                    $query->where('name', 'LIKE', "%{$request->search}%")
+                          ->orWhere('email', 'LIKE', "%{$request->search}%")
+                          ->orWhere('document_number', 'LIKE', "%{$request->search}%");
+                });
+            });
+
+        $customers = $query->orderBy('name')->paginate($request->per_page ?? 15);
+
+        return response()->json([
+            'success' => true,
+            'data' => $customers,
+            'message' => 'Clientes obtenidos exitosamente'
+        ]);
+    }
+
+    /**
+     * Crear nuevo cliente
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'company_id' => 'required|exists:companies,id',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:customers,email',
+            'phone' => 'nullable|string|max:255',
+            'document_type' => 'nullable|string|max:255',
+            'document_number' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'zip_code' => 'nullable|string|max:255',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'status' => 'sometimes|string|max:255',
+            'additional_info' => 'nullable|array'
+        ]);
+
+        $customer = Customer::create($validated);
+        $customer->load('company');
+
+        return response()->json([
+            'success' => true,
+            'data' => $customer,
+            'message' => 'Cliente creado exitosamente'
+        ], 201);
+    }
+
+    /**
+     * Mostrar cliente específico
+     */
+    public function show(Customer $customer): JsonResponse
+    {
+        $customer->load(['company', 'quotes' => function ($query) {
+            $query->orderBy('created_at', 'desc')->limit(10);
+        }]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $customer,
+            'message' => 'Cliente obtenido exitosamente'
+        ]);
+    }
+
+    /**
+     * Actualizar cliente
+     */
+    public function update(Request $request, Customer $customer): JsonResponse
+    {
+        $validated = $request->validate([
+            'company_id' => 'sometimes|required|exists:companies,id',
+            'name' => 'sometimes|required|string|max:255',
+            'email' => ['sometimes', 'required', 'email', Rule::unique('customers')->ignore($customer->id)],
+            'phone' => 'nullable|string|max:255',
+            'document_type' => 'nullable|string|max:255',
+            'document_number' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'zip_code' => 'nullable|string|max:255',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'status' => 'sometimes|string|max:255',
+            'additional_info' => 'nullable|array'
+        ]);
+
+        $customer->update($validated);
+        $customer->load('company');
+
+        return response()->json([
+            'success' => true,
+            'data' => $customer,
+            'message' => 'Cliente actualizado exitosamente'
+        ]);
+    }
+
+    /**
+     * Eliminar cliente
+     */
+    public function destroy(Customer $customer): JsonResponse
+    {
+        // Verificar si tiene cotizaciones asociadas
+        if ($customer->quotes()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede eliminar el cliente porque tiene cotizaciones asociadas'
+            ], 400);
         }
 
-        $customers = $query->withCount('quotes')
-                          ->paginate($request->per_page ?? 20);
-
-        return response()->json($customers);
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:customers',
-            'phone' => 'nullable|string|max:20',
-            'document_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string'
-        ]);
-
-        $customer = Customer::create($request->all());
-
-        return response()->json($customer, 201);
-    }
-
-    public function show(Customer $customer)
-    {
-        return response()->json($customer->load('quotes'));
-    }
-
-    public function update(Request $request, Customer $customer)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:customers,email,' . $customer->id,
-            'phone' => 'nullable|string|max:20',
-            'document_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string'
-        ]);
-
-        $customer->update($request->all());
-
-        return response()->json($customer);
-    }
-
-    public function destroy(Customer $customer)
-    {
         $customer->delete();
-        return response()->json(['message' => 'Cliente eliminado correctamente']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cliente eliminado exitosamente'
+        ]);
+    }
+
+    /**
+     * Obtener clientes activos para select
+     */
+    public function active(Request $request): JsonResponse
+    {
+        $customers = Customer::active()
+            ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
+            ->select('id', 'name', 'email', 'company_id')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $customers
+        ]);
     }
 }

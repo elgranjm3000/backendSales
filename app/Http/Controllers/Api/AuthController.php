@@ -228,7 +228,7 @@ class AuthController extends Controller
         $company->user_id = $user->id;
         $company->name = $request->companyName;
         $company->rif = $request->rif;
-        $company->contact = $request->contactPerson;
+        $company->contact = $request->name;
         $company->address = $request->address;
         $company->country = $request->country;
         $company->province = $request->province;

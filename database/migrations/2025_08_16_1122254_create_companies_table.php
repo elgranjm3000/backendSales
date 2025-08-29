@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete()->comment('Usuario propietario de la compañía');
+            $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete()->comment('Usuario propietario de la compañía');
             $table->string('name');
             $table->string('rif')->unique()->comment('RIF de la compañía');
             $table->text('description')->nullable();

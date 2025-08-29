@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('company_id')->constrained()->cascadeOnDelete()->comment('Compañía a la que pertenece');
             $table->string('name');
             $table->string('email')->unique();
             $table->string('phone')->nullable();
@@ -27,6 +28,8 @@ return new class extends Migration
             $table->string('status')->default('active');
             $table->json('additional_info')->nullable();
             $table->timestamps();
+            $table->index('company_id');
+
         });
     }
 

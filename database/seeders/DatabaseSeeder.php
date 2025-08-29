@@ -14,8 +14,14 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UsersAndCompaniesSeeder::class, // Claves de activación            
-            
+            KeySystemItemSeeder::class,
+            CompanySeeder::class,
+            CategorySeeder::class,
+            ProductSeeder::class,
+            UserSeeder::class,
+            CustomerSeeder::class,
+            QuoteSeeder::class,
+            QuoteItemSeeder::class,           
         ]);
     }
 }

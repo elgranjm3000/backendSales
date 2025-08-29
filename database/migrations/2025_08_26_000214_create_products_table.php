@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('company_id')->constrained()->cascadeOnDelete()->comment('Compañía a la que pertenece');
             $table->string('name');
             $table->string('code')->unique();
             $table->text('description')->nullable();
@@ -28,6 +29,9 @@ return new class extends Migration
             $table->decimal('weight', 10, 3)->default(0);
             $table->json('attributes')->nullable();
             $table->timestamps();
+
+            $table->index('company_id');
+
         });
     }
 

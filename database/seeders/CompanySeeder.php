@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Company;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class CompanySeeder extends Seeder
 {
@@ -15,142 +16,79 @@ class CompanySeeder extends Seeder
     public function run(): void
     {
         // Obtener usuarios con rol company
-        $companyUsers = User::where('role', User::ROLE_COMPANY)->get();
-
-        if ($companyUsers->isEmpty()) {
-            echo "❌ No hay usuarios con rol 'company'. Ejecutar UserSeeder primero.\n";
-            return;
-        }
-
-        // Restaurant El Buen Sabor
-        $user1 = $companyUsers->where('email', 'info@elbuensabor.com')->first();
-        if ($user1) {
-            Company::create([
-                'user_id' => $user1->id,
-                'name' => 'Restaurant El Buen Sabor',
-                'description' => 'Restaurante familiar especializado en comida tradicional ecuatoriana con más de 15 años de experiencia.',
-                'address' => 'Av. 10 de Agosto 1234, Quito, Ecuador',
-                'phone' => '+593234567890',
-                'email' => 'ventas@elbuensabor.com',
-                'contact' => 'María Elena Vásquez',
-                'serial_no' => 'RES001-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-
-            // Segunda sucursal del mismo usuario
-            Company::create([
-                'user_id' => $user1->id,
-                'name' => 'El Buen Sabor - Sucursal Norte',
-                'description' => 'Sucursal norte del reconocido Restaurant El Buen Sabor, manteniendo la calidad y tradición.',
-                'address' => 'Av. Amazonas 2567, Quito, Ecuador',
-                'phone' => '+593234567891',
-                'email' => 'norte@elbuensabor.com',
-                'contact' => 'Carlos Mendoza',
-                'serial_no' => 'RES001N-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-        }
-
-        // Pizzería Italiana
-        $user2 = $companyUsers->where('email', 'contacto@pizzeriaitaliana.com')->first();
-        if ($user2) {
-            Company::create([
-                'user_id' => $user2->id,
-                'name' => 'Pizzería Italiana Don Giovanni',
-                'description' => 'Auténtica pizzería italiana con recetas tradicionales traídas directamente desde Nápoles.',
-                'address' => 'Calle Italia 456, La Mariscal, Quito',
-                'phone' => '+593345678901',
-                'email' => 'pedidos@pizzeriaitaliana.com',
-                'contact' => 'Giuseppe Rossi',
-                'serial_no' => 'PIZ002-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-        }
-
-        // Café Central
-        $user3 = $companyUsers->where('email', 'gerencia@cafecentral.com')->first();
-        if ($user3) {
-            Company::create([
-                'user_id' => $user3->id,
-                'name' => 'Café Central',
-                'description' => 'Cafetería boutique especializada en café de altura ecuatoriano y repostería artesanal.',
-                'address' => 'Plaza San Francisco, Centro Histórico, Quito',
-                'phone' => '+593456789012',
-                'email' => 'info@cafecentral.com',
-                'contact' => 'Andrea Morales',
-                'serial_no' => 'CAF003-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-
-            // Segunda sucursal de café
-            Company::create([
-                'user_id' => $user3->id,
-                'name' => 'Café Central - Mall El Jardín',
-                'description' => 'Sucursal moderna de Café Central ubicada en el centro comercial más visitado de la ciudad.',
-                'address' => 'Mall El Jardín, Local 205, Quito',
-                'phone' => '+593456789013',
-                'email' => 'mall@cafecentral.com',
-                'contact' => 'Roberto Silva',
-                'serial_no' => 'CAF003M-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-        }
-
-        // Marisquería Del Puerto
-        $user4 = $companyUsers->where('email', 'admin@marisqueriadelpuerto.com')->first();
-        if ($user4) {
-            Company::create([
-                'user_id' => $user4->id,
-                'name' => 'Marisquería Del Puerto',
-                'description' => 'Especialistas en mariscos frescos y ceviches preparados con pescado del día traído directamente del puerto.',
-                'address' => 'Malecón Simón Bolívar 890, Guayaquil',
-                'phone' => '+593567890123',
-                'email' => 'reservas@marisqueriadelpuerto.com',
-                'contact' => 'Captain Jorge Anchundia',
-                'serial_no' => 'MAR004-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-        }
-
-        // Crear algunas compañías adicionales para demostrar múltiples compañías por usuario
-        if ($companyUsers->count() > 0) {
-            // Compañía adicional para el primer usuario company
-            $firstCompanyUser = $companyUsers->first();
-            Company::create([
-                'user_id' => $firstCompanyUser->id,
-                'name' => 'Food Truck Delicias',
-                'description' => 'Food truck móvil especializado en comida rápida gourmet para eventos y catering.',
-                'address' => 'Ubicación variable - Quito y alrededores',
-                'phone' => '+593234567892',
-                'email' => 'foodtruck@elbuensabor.com',
-                'contact' => 'Miguel Ángel Torres',
-                'serial_no' => 'FTK001-2024',
-                'status' => Company::STATUS_ACTIVE,
-            ]);
-        }
-
-        // Crear una compañía inactiva para pruebas
-        if ($companyUsers->count() > 1) {
-            $secondCompanyUser = $companyUsers->skip(1)->first();
-            Company::create([
-                'user_id' => $secondCompanyUser->id,
-                'name' => 'Pizzería Italiana - Sucursal Sur (Cerrada)',
-                'description' => 'Sucursal temporalmente cerrada por remodelación.',
-                'address' => 'Av. Quitumbe 123, Quito Sur',
-                'phone' => '+593345678902',
-                'email' => 'sur@pizzeriaitaliana.com',
-                'contact' => 'Marco Benedetti',
-                'serial_no' => 'PIZ002S-2024',
-                'status' => Company::STATUS_INACTIVE,
-            ]);
-        }
-
-        echo "✅ CompanySeeder completado: " . Company::count() . " compañías creadas\n";
-        echo "📊 Distribución por usuario:\n";
-        
-        foreach ($companyUsers as $user) {
-            $count = Company::where('user_id', $user->id)->count();
-            echo "   - {$user->name}: {$count} compañía(s)\n";
-        }
+        DB::table('companies')->insert([
+            [
+                'user_id' => null,
+                'name' => 'Restaurante El Buen Sabor',
+                'rif' => 'J-30123456-7',
+                'description' => 'Restaurante especializado en comida criolla venezolana con más de 15 años de experiencia',
+                'address' => 'Av. Principal, Centro Comercial Plaza Venezuela, Local 15',
+                'country' => 'Venezuela',
+                'province' => 'Miranda',
+                'city' => 'Caracas',
+                'phone' => '+58 212-555-0101',
+                'logo' => null,
+                'logo_type' => null,
+                'email' => 'info@elbuensabor.com',
+                'contact' => 'María González',
+                'key_system_items_id' => 1,
+                'serial_no' => 'REST-001-2024',
+                'restaurant_image' => null,
+                'restaurant_image_type' => null,
+                'main_image' => null,
+                'main_image_type' => null,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => null,
+                'name' => 'Panadería San José',
+                'rif' => 'J-31234567-8',
+                'description' => 'Panadería artesanal familiar con más de 20 años elaborando productos frescos diariamente',
+                'address' => 'Calle 5ta con Av. Libertador, Sector La Candelaria',
+                'country' => 'Venezuela',
+                'province' => 'Distrito Capital',
+                'city' => 'Caracas',
+                'phone' => '+58 212-555-0102',
+                'logo' => null,
+                'logo_type' => null,
+                'email' => 'ventas@panaderiasanjose.com',
+                'contact' => 'José Rodríguez',
+                'key_system_items_id' => 2,
+                'serial_no' => 'PAN-002-2024',
+                'restaurant_image' => null,
+                'restaurant_image_type' => null,
+                'main_image' => null,
+                'main_image_type' => null,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'user_id' => null,
+                'name' => 'Cafetería Central',
+                'rif' => 'J-32345678-9',
+                'description' => 'Cafetería moderna con ambiente acogedor, especializada en cafés especiales y comida rápida',
+                'address' => 'Plaza Bolívar, Edificio Centro, Local 15-16',
+                'country' => 'Venezuela',
+                'province' => 'Carabobo',
+                'city' => 'Valencia',
+                'phone' => '+58 241-555-0103',
+                'logo' => null,
+                'logo_type' => null,
+                'email' => 'contacto@cafeteriacentral.com',
+                'contact' => 'Ana Martínez',
+                'key_system_items_id' => 3,
+                'serial_no' => 'CAF-003-2024',
+                'restaurant_image' => null,
+                'restaurant_image_type' => null,
+                'main_image' => null,
+                'main_image_type' => null,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
     }
 }

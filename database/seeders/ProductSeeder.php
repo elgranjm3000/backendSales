@@ -1,142 +1,295 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Product;
-use App\Models\Category;
+use Illuminate\Support\Facades\DB;
 
 class ProductSeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
-        $electronics = Category::where('name', 'Electrónicos')->first();
-        $clothing = Category::where('name', 'Ropa')->first();
-        $home = Category::where('name', 'Hogar')->first();
-        $sports = Category::where('name', 'Deportes')->first();
-
-        $products = [
-            // Electrónicos
+        DB::table('products')->insert([
+            // Productos para Restaurante El Buen Sabor
             [
-                'name' => 'iPhone 15 Pro',
-                'code' => 'IP15PRO001',
-                'description' => 'Smartphone Apple iPhone 15 Pro 128GB',
-                'price' => 3599.00,
-                'cost' => 2800.00,
-                'stock' => 15,
-                'min_stock' => 5,
-                'category_id' => $electronics->id,
-                'barcode' => '1234567890123',
-                'weight' => 0.187
-            ],
-            [
-                'name' => 'Samsung Galaxy S24',
-                'code' => 'SGS24001',
-                'description' => 'Smartphone Samsung Galaxy S24 256GB',
-                'price' => 2899.00,
-                'cost' => 2200.00,
-                'stock' => 20,
-                'min_stock' => 5,
-                'category_id' => $electronics->id,
-                'barcode' => '2345678901234'
-            ],
-            [
-                'name' => 'MacBook Air M3',
-                'code' => 'MBA001',
-                'description' => 'Laptop Apple MacBook Air 13" M3 8GB 256GB',
-                'price' => 4999.00,
-                'cost' => 4200.00,
-                'stock' => 8,
-                'min_stock' => 3,
-                'category_id' => $electronics->id,
-                'weight' => 1.24
-            ],
-            [
-                'name' => 'AirPods Pro 2',
-                'code' => 'APP2001',
-                'description' => 'Audífonos inalámbricos Apple AirPods Pro 2da Gen',
-                'price' => 899.00,
-                'cost' => 650.00,
-                'stock' => 25,
-                'min_stock' => 10,
-                'category_id' => $electronics->id,
-                'weight' => 0.061
-            ],
-
-            // Ropa
-            [
-                'name' => 'Polo Nike Dri-FIT',
-                'code' => 'POLO001',
-                'description' => 'Polo deportivo Nike Dri-FIT para hombre',
-                'price' => 89.90,
-                'cost' => 55.00,
+                'company_id' => 1,
+                'name' => 'Tequeños',
+                'code' => 'ENT001',
+                'description' => 'Deliciosos tequeños de queso blanco (porción de 6 unidades)',
+                'price' => 15.00,
+                'cost' => 8.00,
                 'stock' => 50,
-                'min_stock' => 15,
-                'category_id' => $clothing->id,
-                'attributes' => ['tallas' => ['S', 'M', 'L', 'XL'], 'colores' => ['Negro', 'Blanco', 'Azul']]
-            ],
-            [
-                'name' => 'Jeans Levis 501',
-                'code' => 'JEAN001',
-                'description' => 'Jeans clásicos Levis 501 Original',
-                'price' => 299.00,
-                'cost' => 180.00,
-                'stock' => 30,
                 'min_stock' => 10,
-                'category_id' => $clothing->id,
-                'attributes' => ['tallas' => ['28', '30', '32', '34', '36']]
+                'image' => 'tequenos.jpg',
+                'images' => json_encode(['tequenos1.jpg', 'tequenos2.jpg']),
+                'category_id' => 1,
+                'status' => 'active',
+                'barcode' => '7501234567890',
+                'weight' => 0.300,
+                'attributes' => json_encode([
+                    'picante' => false,
+                    'vegetariano' => true,
+                    'unidades' => 6
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
-
-            // Hogar
             [
-                'name' => 'Cafetera Nespresso',
-                'code' => 'CAF001',
-                'description' => 'Cafetera Nespresso Vertuo Next',
-                'price' => 459.00,
-                'cost' => 320.00,
-                'stock' => 12,
+                'company_id' => 1,
+                'name' => 'Pabellón Criollo',
+                'code' => 'PRIN001',
+                'description' => 'Plato típico venezolano: carne mechada, caraotas negras, arroz blanco y tajadas',
+                'price' => 35.00,
+                'cost' => 20.00,
+                'stock' => 30,
                 'min_stock' => 5,
-                'category_id' => $home->id,
-                'weight' => 4.0
+                'image' => 'pabellon.jpg',
+                'images' => json_encode(['pabellon1.jpg', 'pabellon2.jpg']),
+                'category_id' => 2,
+                'status' => 'active',
+                'barcode' => '7501234567891',
+                'weight' => 0.500,
+                'attributes' => json_encode([
+                    'picante' => false,
+                    'vegetariano' => false,
+                    'carne' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Aspiradora Dyson V15',
-                'code' => 'ASP001',
-                'description' => 'Aspiradora inalámbrica Dyson V15 Detect',
-                'price' => 2199.00,
-                'cost' => 1650.00,
-                'stock' => 6,
-                'min_stock' => 2,
-                'category_id' => $home->id,
-                'weight' => 3.1
-            ],
-
-            // Deportes
-            [
-                'name' => 'Zapatillas Nike Air Max',
-                'code' => 'ZAP001',
-                'description' => 'Zapatillas Nike Air Max 270 para running',
-                'price' => 399.00,
-                'cost' => 250.00,
+                'company_id' => 1,
+                'name' => 'Arepa Reina Pepiada',
+                'code' => 'PRIN002',
+                'description' => 'Arepa de maíz rellena con ensalada de pollo y aguacate',
+                'price' => 18.00,
+                'cost' => 10.00,
                 'stock' => 40,
-                'min_stock' => 15,
-                'category_id' => $sports->id,
-                'attributes' => ['tallas' => ['39', '40', '41', '42', '43', '44']]
+                'min_stock' => 8,
+                'image' => 'arepa_reina.jpg',
+                'images' => json_encode(['arepa_reina1.jpg']),
+                'category_id' => 2,
+                'status' => 'active',
+                'barcode' => '7501234567892',
+                'weight' => 0.250,
+                'attributes' => json_encode([
+                    'picante' => false,
+                    'vegetariano' => false,
+                    'pollo' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Pelota de Fútbol Adidas',
-                'code' => 'PEL001',
-                'description' => 'Pelota de fútbol Adidas FIFA Quality Pro',
-                'price' => 89.00,
-                'cost' => 55.00,
+                'company_id' => 1,
+                'name' => 'Quesillo',
+                'code' => 'POST001',
+                'description' => 'Postre tradicional venezolano tipo flan de caramelo',
+                'price' => 12.00,
+                'cost' => 6.00,
                 'stock' => 25,
-                'min_stock' => 8,
-                'category_id' => $sports->id,
-                'weight' => 0.41
-            ]
-        ];
-
-        foreach ($products as $product) {
-            Product::create($product);
-        }
+                'min_stock' => 5,
+                'image' => 'quesillo.jpg',
+                'images' => json_encode(['quesillo1.jpg']),
+                'category_id' => 3,
+                'status' => 'active',
+                'barcode' => '7501234567893',
+                'weight' => 0.150,
+                'attributes' => json_encode([
+                    'vegetariano' => true,
+                    'lacteo' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 1,
+                'name' => 'Jugo Natural',
+                'code' => 'BEB001',
+                'description' => 'Jugo natural de frutas de temporada (naranja, guayaba, parchita)',
+                'price' => 8.00,
+                'cost' => 4.00,
+                'stock' => 60,
+                'min_stock' => 15,
+                'image' => 'jugo.jpg',
+                'images' => json_encode(['jugo1.jpg', 'jugo2.jpg']),
+                'category_id' => 4,
+                'status' => 'active',
+                'barcode' => '7501234567894',
+                'weight' => 0.300,
+                'attributes' => json_encode([
+                    'natural' => true,
+                    'vegetariano' => true,
+                    'sin_azucar_agregada' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            
+            // Productos para Panadería San José
+            [
+                'company_id' => 2,
+                'name' => 'Pan Canilla',
+                'code' => 'PAN001',
+                'description' => 'Pan tradicional venezolano, suave y fresco',
+                'price' => 2.50,
+                'cost' => 1.20,
+                'stock' => 100,
+                'min_stock' => 20,
+                'image' => 'pan_canilla.jpg',
+                'images' => json_encode(['pan_canilla1.jpg']),
+                'category_id' => 5,
+                'status' => 'active',
+                'barcode' => '7501234567895',
+                'weight' => 0.080,
+                'attributes' => json_encode([
+                    'integral' => false,
+                    'vegetariano' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 2,
+                'name' => 'Pan Integral',
+                'code' => 'PAN002',
+                'description' => 'Pan integral con semillas de ajonjolí y girasol',
+                'price' => 4.00,
+                'cost' => 2.00,
+                'stock' => 50,
+                'min_stock' => 10,
+                'image' => 'pan_integral.jpg',
+                'images' => json_encode(['pan_integral1.jpg']),
+                'category_id' => 5,
+                'status' => 'active',
+                'barcode' => '7501234567896',
+                'weight' => 0.100,
+                'attributes' => json_encode([
+                    'integral' => true,
+                    'semillas' => true,
+                    'vegetariano' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 2,
+                'name' => 'Torta de Chocolate',
+                'code' => 'PAST001',
+                'description' => 'Torta de chocolate con cobertura, ideal para 8 personas',
+                'price' => 45.00,
+                'cost' => 25.00,
+                'stock' => 15,
+                'min_stock' => 3,
+                'image' => 'torta_chocolate.jpg',
+                'images' => json_encode(['torta_chocolate1.jpg', 'torta_chocolate2.jpg']),
+                'category_id' => 6,
+                'status' => 'active',
+                'barcode' => '7501234567897',
+                'weight' => 1.000,
+                'attributes' => json_encode([
+                    'sabor' => 'chocolate',
+                    'porciones' => 8,
+                    'vegetariano' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 2,
+                'name' => 'Galletas de Avena',
+                'code' => 'GAL001',
+                'description' => 'Galletas caseras de avena con pasas (paquete de 12 unidades)',
+                'price' => 10.00,
+                'cost' => 5.00,
+                'stock' => 30,
+                'min_stock' => 6,
+                'image' => 'galletas_avena.jpg',
+                'images' => json_encode(['galletas_avena1.jpg']),
+                'category_id' => 7,
+                'status' => 'active',
+                'barcode' => '7501234567898',
+                'weight' => 0.200,
+                'attributes' => json_encode([
+                    'avena' => true,
+                    'pasas' => true,
+                    'cantidad' => 12,
+                    'vegetariano' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            
+            // Productos para Cafetería Central
+            [
+                'company_id' => 3,
+                'name' => 'Café Americano',
+                'code' => 'CAF001',
+                'description' => 'Café americano tradicional, servido caliente',
+                'price' => 6.00,
+                'cost' => 2.50,
+                'stock' => 80,
+                'min_stock' => 20,
+                'image' => 'cafe_americano.jpg',
+                'images' => json_encode(['cafe_americano1.jpg']),
+                'category_id' => 8,
+                'status' => 'active',
+                'barcode' => '7501234567899',
+                'weight' => 0.250,
+                'attributes' => json_encode([
+                    'tipo' => 'americano',
+                    'tamaño' => 'regular',
+                    'vegetariano' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 3,
+                'name' => 'Cappuccino',
+                'code' => 'CAF002',
+                'description' => 'Cappuccino con espuma de leche cremosa y canela',
+                'price' => 9.00,
+                'cost' => 4.00,
+                'stock' => 60,
+                'min_stock' => 15,
+                'image' => 'cappuccino.jpg',
+                'images' => json_encode(['cappuccino1.jpg']),
+                'category_id' => 8,
+                'status' => 'active',
+                'barcode' => '7501234567900',
+                'weight' => 0.300,
+                'attributes' => json_encode([
+                    'tipo' => 'cappuccino',
+                    'leche' => true,
+                    'vegetariano' => true
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 3,
+                'name' => 'Sandwich Club',
+                'code' => 'SNK001',
+                'description' => 'Sandwich club house con jamón, queso, tomate, lechuga y papas fritas',
+                'price' => 22.00,
+                'cost' => 12.00,
+                'stock' => 25,
+                'min_stock' => 5,
+                'image' => 'sandwich_club.jpg',
+                'images' => json_encode(['sandwich_club1.jpg']),
+                'category_id' => 9,
+                'status' => 'active',
+                'barcode' => '7501234567901',
+                'weight' => 0.350,
+                'attributes' => json_encode([
+                    'incluye' => 'papas fritas',
+                    'tipo' => 'club house',
+                    'vegetariano' => false
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
     }
 }

@@ -174,7 +174,7 @@ class SellerController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        $seller = Seller::with(['user:id,name,email,role', 'company:id,name'])->find($id);
+        $seller = Seller::with(['user:id,name,email,role', 'company:id,user_id,name'])->find($id);   
 
         if (!$seller) {
             return response()->json([
@@ -194,7 +194,7 @@ class SellerController extends Controller
                 $canView = $seller->company->user_id === $user->id;
                 break;
             case User::ROLE_SELLER:
-                $canView = $seller->user_id === $user->id;
+                $canView = $seller->company->user_id === $user->id;
                 break;
         }
 

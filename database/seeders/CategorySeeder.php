@@ -2,47 +2,99 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Category;
+use Illuminate\Support\Facades\DB;
 
 class CategorySeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
-        $categories = [
+        DB::table('categories')->insert([
+            // Categorías para Restaurante El Buen Sabor
             [
-                'name' => 'Electrónicos',
-                'description' => 'Dispositivos electrónicos y tecnología',
-                'status' => 'active'
+                'company_id' => 1,
+                'name' => 'Entradas',
+                'description' => 'Aperitivos y entradas para abrir el apetito',
+                'image' => 'entradas.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Ropa',
-                'description' => 'Prendas de vestir y accesorios',
-                'status' => 'active'
+                'company_id' => 1,
+                'name' => 'Platos Principales',
+                'description' => 'Platos fuertes de la casa, especialidades criollas',
+                'image' => 'principales.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Hogar',
-                'description' => 'Artículos para el hogar y decoración',
-                'status' => 'active'
+                'company_id' => 1,
+                'name' => 'Postres',
+                'description' => 'Deliciosos postres caseros y tradicionales',
+                'image' => 'postres.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Deportes',
-                'description' => 'Artículos deportivos y fitness',
-                'status' => 'active'
+                'company_id' => 1,
+                'name' => 'Bebidas',
+                'description' => 'Bebidas frías, calientes y jugos naturales',
+                'image' => 'bebidas.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            
+            // Categorías para Panadería San José
+            [
+                'company_id' => 2,
+                'name' => 'Panes',
+                'description' => 'Panes frescos horneados diariamente',
+                'image' => 'panes.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Libros',
-                'description' => 'Libros y material educativo',
-                'status' => 'active'
+                'company_id' => 2,
+                'name' => 'Pasteles',
+                'description' => 'Pasteles y tortas para toda ocasión especial',
+                'image' => 'pasteles.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
-                'name' => 'Belleza',
-                'description' => 'Productos de belleza y cuidado personal',
-                'status' => 'active'
-            ]
-        ];
-
-        foreach ($categories as $category) {
-            Category::create($category);
-        }
+                'company_id' => 2,
+                'name' => 'Galletas',
+                'description' => 'Galletas artesanales de diversos sabores',
+                'image' => 'galletas.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            
+            // Categorías para Cafetería Central
+            [
+                'company_id' => 3,
+                'name' => 'Cafés',
+                'description' => 'Variedad de cafés especiales y bebidas calientes',
+                'image' => 'cafes.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'company_id' => 3,
+                'name' => 'Snacks',
+                'description' => 'Snacks, bocadillos y comida rápida',
+                'image' => 'snacks.jpg',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
     }
 }
