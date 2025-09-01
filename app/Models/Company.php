@@ -87,4 +87,9 @@ class Company extends Model
     {
         return $this->sellers()->count();
     }
+
+    public function keySystemItem()
+    {
+        return $this->belongsTo(KeySystemItem::class, 'key_system_items_id');
+    }
 }

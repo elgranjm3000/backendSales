@@ -67,9 +67,10 @@ class ProductController extends Controller
     /**
      * Mostrar producto específico
      */
-    public function show(Product $product): JsonResponse
+    public function show(Product $product,$id): JsonResponse
     {
-        $product->load(['company', 'category']);
+        
+        $product = Product::with('company','category')->find($id);
 
         return response()->json([
             'success' => true,

@@ -77,6 +77,12 @@ use App\Http\Controllers\Api\QuoteController;
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
+Route::post('/users/check', [AuthController::class, 'checkCompanyInfo']);
+Route::post('/users/stepConfirm', [AuthController::class, 'confirmCompanyRegistration']);
+Route::post('/users/validateCompanyCode', [AuthController::class, 'validateCompanyCode']);
+Route::post('/users/completeCompanyRegistration', [AuthController::class, 'completeCompanyRegistration']);
+
+
 Route::post('/users/register', [AuthController::class, 'register']);
 
 
@@ -101,6 +107,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index']);
 
     Route::prefix('products')->group(function () {
+        Route::get('/', [ProductController::class, 'index']);
+        Route::post('/', [ProductController::class, 'store']);
+        Route::get('{id}', [ProductController::class, 'show']);
+        Route::put('{id}', [ProductController::class, 'update']);
+        Route::delete('{id}', [ProductController::class, 'destroy']);
+        
+        // Vendedores de una compañía específica
+    });
+    Route::prefix('categories')->group(function () {
         Route::get('/', [ProductController::class, 'index']);
         Route::post('/', [ProductController::class, 'store']);
         Route::get('{id}', [ProductController::class, 'show']);

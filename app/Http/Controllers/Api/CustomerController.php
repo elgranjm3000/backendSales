@@ -70,11 +70,21 @@ class CustomerController extends Controller
     /**
      * Mostrar cliente específico
      */
-    public function show(Customer $customer): JsonResponse
+    public function show(Customer $customer,$id): JsonResponse
     {
-        $customer->load(['company', 'quotes' => function ($query) {
-            $query->orderBy('created_at', 'desc')->limit(10);
-        }]);
+        $customer = Customer::with([
+            'company',
+            'quotes' => function ($query) {
+                $query->orderBy('created_at', 'desc')->limit(10);
+            }
+        ])->find($id);
+
+        if (!$customer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cliente no encontrado'
+            ], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -86,12 +96,15 @@ class CustomerController extends Controller
     /**
      * Actualizar cliente
      */
-    public function update(Request $request, Customer $customer): JsonResponse
+    public function update(Request $request,$id): JsonResponse
     {
+  
+        $customer = Customer::find($id);
+
         $validated = $request->validate([
             'company_id' => 'sometimes|required|exists:companies,id',
             'name' => 'sometimes|required|string|max:255',
-            'email' => ['sometimes', 'required', 'email', Rule::unique('customers')->ignore($customer->id)],
+            'email' => ['sometimes', 'required', 'email', Rule::unique('customers')->ignore($id)],
             'phone' => 'nullable|string|max:255',
             'document_type' => 'nullable|string|max:255',
             'document_number' => 'nullable|string|max:255',
@@ -118,8 +131,10 @@ class CustomerController extends Controller
     /**
      * Eliminar cliente
      */
-    public function destroy(Customer $customer): JsonResponse
+    public function destroy(Customer $customer,$id): JsonResponse
     {
+        $customer = Customer::find($id);
+
         // Verificar si tiene cotizaciones asociadas
         if ($customer->quotes()->count() > 0) {
             return response()->json([
