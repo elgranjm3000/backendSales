@@ -134,16 +134,14 @@ class QuoteController extends Controller
             }
 
             $discount = $request->discount ?? 0;
-            $tax = ($subtotal - $discount) * 0.18; // IGV 18%
-            $total = $subtotal + $tax - $discount;
+            $tax = 16; // IGV 18%
+            $total = $subtotal;
 
             $quote = Quote::create([
                 'customer_id' => $request->customer_id,
                 'company_id' => $request->company_id,
-                'subtotal' => $subtotal,
                 'tax' => $tax,
                 'discount' => $discount,
-                'total' => $total,
                 'status' => Quote::STATUS_DRAFT,
                 'quote_date' => now(),
                 'valid_until' => $request->valid_until,
@@ -159,7 +157,7 @@ class QuoteController extends Controller
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'total' => $item['quantity'] * $item['unit_price'],
-                    'discount_amount' => $item['discount'] ?? 0,
+                    'discount_percentage' => $item['discount'] ?? 0,
                     'name' => $item['name'] ?? null,
                 ]);
             }

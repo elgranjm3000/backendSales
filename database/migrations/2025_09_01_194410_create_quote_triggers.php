@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::table('quotes', function (Blueprint $table) {
+             $table->decimal('tax_amount', 15, 2)->default(0)->after('tax');
+            $table->decimal('discount_amount', 15, 2)->default(0)->after('discount');
+        });
           DB::unprepared('
             DROP FUNCTION IF EXISTS calculate_quote_item_totals;
         ');
@@ -209,144 +213,54 @@ return new class extends Migration
         DB::unprepared('
             DROP PROCEDURE IF EXISTS update_quote_totals;
         ');
-        
         DB::unprepared('
             CREATE PROCEDURE update_quote_totals(IN p_quote_id BIGINT)
             BEGIN
                 DECLARE v_subtotal DECIMAL(15,2) DEFAULT 0.00;
-                DECLARE v_tax DECIMAL(15,2) DEFAULT 0.00;
+                DECLARE v_tax_percentage DECIMAL(5,2) DEFAULT 0.00;
+                DECLARE v_discount_percentage DECIMAL(5,2) DEFAULT 0.00;
+                DECLARE v_discount_amount DECIMAL(15,2) DEFAULT 0.00;
+                DECLARE v_tax_amount DECIMAL(15,2) DEFAULT 0.00;
                 DECLARE v_total DECIMAL(15,2) DEFAULT 0.00;
-                DECLARE v_quote_discount DECIMAL(15,2) DEFAULT 0.00;
-                DECLARE v_final_total DECIMAL(15,2) DEFAULT 0.00;
-                
-                -- Obtener descuento actual del quote
-                SELECT discount INTO v_quote_discount 
-                FROM quotes 
-                WHERE id = p_quote_id;
-                
-                -- Calcular totales desde los items
-                SELECT 
-                    COALESCE(SUM(subtotal), 0.00),
-                    COALESCE(SUM(tax_amount), 0.00),
-                    COALESCE(SUM(total), 0.00)
-                INTO v_subtotal, v_tax, v_total
-                FROM quote_items 
+
+                -- Obtener subtotal desde los items
+                SELECT COALESCE(SUM(total), 0.00)
+                INTO v_subtotal
+                FROM quote_items
                 WHERE quote_id = p_quote_id;
-                
-                -- Aplicar descuento general del quote al subtotal
-                SET v_final_total = v_total - (v_subtotal * (v_quote_discount / v_subtotal)) + v_tax;
-                
-                -- Actualizar totales en la tabla quotes
-                UPDATE quotes 
-                SET 
+
+                -- Obtener porcentaje de impuesto y descuento
+                SELECT tax, discount INTO v_tax_percentage, v_discount_percentage
+                FROM quotes WHERE id = p_quote_id;
+
+                -- Calcular montos
+                SET v_discount_amount = v_subtotal * (v_discount_percentage / 100);
+                SET v_tax_amount = (v_subtotal - v_discount_amount) * (v_tax_percentage / 100);
+
+                -- Calcular total
+                SET v_total = v_subtotal - v_discount_amount + v_tax_amount;
+
+                -- Actualizar la tabla quotes
+                UPDATE quotes
+                SET
                     subtotal = v_subtotal,
-                    tax = v_tax,
-                    total = v_final_total,
+                    discount_amount = v_discount_amount,
+                    tax_amount = v_tax_amount,
+                    total = v_total,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = p_quote_id;
             END
         ');
 
-        // TRIGGERS PARA QUOTES
-        
-        // Trigger BEFORE INSERT para quotes
-        DB::unprepared('
-            DROP TRIGGER IF EXISTS quotes_before_insert;
-        ');
-        
-        DB::unprepared('
-            CREATE TRIGGER quotes_before_insert
-            BEFORE INSERT ON quotes
-            FOR EACH ROW
-            BEGIN
-                -- Validaciones
-                IF NEW.discount < 0 OR NEW.discount > NEW.subtotal THEN
-                    SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = "El descuento no puede ser negativo ni mayor al subtotal";
-                END IF;
-                
-                IF NEW.valid_until <= CURDATE() THEN
-                    SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = "La fecha de validez debe ser posterior a hoy";
-                END IF;
-                
-                -- Generar número de quote si no existe
-                IF NEW.quote_number IS NULL OR NEW.quote_number = "" THEN
-                    SET NEW.quote_number = CONCAT("COT-", YEAR(CURDATE()), "-", LPAD(MONTH(CURDATE()), 2, "0"), "-", LPAD(DAY(CURDATE()), 2, "0"), "-", LPAD((
-                        SELECT COALESCE(MAX(SUBSTRING(quote_number, -6)), 0) + 1
-                        FROM quotes 
-                        WHERE quote_number LIKE CONCAT("COT-", YEAR(CURDATE()), "-", LPAD(MONTH(CURDATE()), 2, "0"), "-", LPAD(DAY(CURDATE()), 2, "0"), "-%")
-                    ), 6, "0"));
-                END IF;
-                
-                -- Establecer fecha de cotización si no existe
-                IF NEW.quote_date IS NULL THEN
-                    SET NEW.quote_date = CURRENT_TIMESTAMP;
-                END IF;
-                
-                -- Asegurar timestamps
-                IF NEW.created_at IS NULL THEN
-                    SET NEW.created_at = CURRENT_TIMESTAMP;
-                END IF;
-                SET NEW.updated_at = CURRENT_TIMESTAMP;
-            END
-        ');
-
-        // Trigger BEFORE UPDATE para quotes
-        DB::unprepared('
-            DROP TRIGGER IF EXISTS quotes_before_update;
-        ');
-        
-        DB::unprepared('
-            CREATE TRIGGER quotes_before_update
-            BEFORE UPDATE ON quotes
-            FOR EACH ROW
-            BEGIN
-                -- Validaciones
-                IF NEW.discount < 0 OR NEW.discount > NEW.subtotal THEN
-                    SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = "El descuento no puede ser negativo ni mayor al subtotal";
-                END IF;
-                
-                -- No permitir cambiar fecha de validez a una fecha pasada si el estado no es draft
-                IF NEW.status != "draft" AND NEW.valid_until <= CURDATE() THEN
-                    SIGNAL SQLSTATE "45000" SET MESSAGE_TEXT = "No se puede establecer una fecha de validez pasada para cotizaciones enviadas";
-                END IF;
-                
-                -- Marcar automáticamente como expirado si la fecha de validez ya pasó
-                IF NEW.valid_until < CURDATE() AND NEW.status NOT IN ("expired", "approved", "rejected") THEN
-                    SET NEW.status = "expired";
-                END IF;
-                
-                -- Establecer fechas de estado automáticamente
-                IF NEW.status = "sent" AND OLD.status != "sent" AND NEW.sent_at IS NULL THEN
-                    SET NEW.sent_at = CURRENT_TIMESTAMP;
-                END IF;
-                
-                IF NEW.status = "approved" AND OLD.status != "approved" AND NEW.approved_at IS NULL THEN
-                    SET NEW.approved_at = CURRENT_TIMESTAMP;
-                END IF;
-                
-                -- Si cambió el descuento, recalcular totales
-                IF NEW.discount != OLD.discount THEN
-                    -- El procedimiento update_quote_totals se encargará del cálculo
-                    SET NEW.total = NEW.subtotal + NEW.tax - NEW.discount;
-                END IF;
-                
-                -- Actualizar timestamp
-                SET NEW.updated_at = CURRENT_TIMESTAMP;
-            END
-        ');
-
-        // Trigger AFTER UPDATE para quotes (recalcular totales si cambió el descuento)
         DB::unprepared('
             DROP TRIGGER IF EXISTS quotes_after_update;
         ');
-        
         DB::unprepared('
             CREATE TRIGGER quotes_after_update
             AFTER UPDATE ON quotes
             FOR EACH ROW
             BEGIN
-                -- Si cambió el descuento general, recalcular totales
-                IF NEW.discount != OLD.discount THEN
+                IF NEW.discount != OLD.discount OR NEW.tax != OLD.tax THEN
                     CALL update_quote_totals(NEW.id);
                 END IF;
             END
@@ -358,6 +272,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('quotes', function (Blueprint $table) {
+        $table->dropColumn(['tax_amount', 'discount_amount']);
+    });
           // Eliminar triggers de quote_items
         DB::unprepared('DROP TRIGGER IF EXISTS quote_items_before_insert');
         DB::unprepared('DROP TRIGGER IF EXISTS quote_items_before_update');
