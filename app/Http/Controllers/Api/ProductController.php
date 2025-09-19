@@ -22,7 +22,7 @@ class ProductController extends Controller
             ->when($request->low_stock, fn($q) => $q->lowStock())
             ->when($request->search, fn($q) => $q->search($request->search));
 
-        $products = $query->orderBy('name')->paginate($request->per_page ?? 15);
+        $products = $query->orderBy('name')->get(); //->paginate($request->per_page ?? 15);
 
         return response()->json([
             'success' => true,

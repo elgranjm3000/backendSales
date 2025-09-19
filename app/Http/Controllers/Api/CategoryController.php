@@ -20,7 +20,7 @@ class CategoryController extends Controller
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->search, fn($q) => $q->where('name', 'LIKE', "%{$request->search}%"));
 
-        $categories = $query->orderBy('name')->paginate($request->per_page ?? 15);
+        $categories = $query->orderBy('name')->get(); //paginate($request->per_page ?? 15);
 
         return response()->json([
             'success' => true,

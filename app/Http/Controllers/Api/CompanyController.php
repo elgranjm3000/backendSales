@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Seller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -29,6 +30,19 @@ class CompanyController extends Controller
             case User::ROLE_COMPANY:
                 // Company solo puede ver sus propias compañías
                 $query->where('user_id', $user->id);
+                break;
+            case User::ROLE_SELLER:
+              //  $query = Seller::with('user:id,name,email');
+                  $seller = Seller::where('user_id', $user->id)->first();
+                if ($seller) {
+                    $query->where('id', $seller->company_id);
+                } else {
+                    // Si el vendedor no está asociado a ninguna compañía, devolver vacío
+                    $query->whereRaw('1 = 0');
+                }
+
+                // Company solo puede ver sus propias compañías
+            //    $query->where('user_id', $user->id);
                 break;
             default:
                 return response()->json([
@@ -280,9 +294,11 @@ class CompanyController extends Controller
      */
     public function sellers(Request $request, $id)
     {
+       
         $user = $request->user();
         $company = Company::find($id);
-
+     //   $sellers = Seller::where('company_id', $id)->get();
+     
         if (!$company) {
             return response()->json([
                 'success' => false,

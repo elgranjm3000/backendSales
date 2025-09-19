@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\SellerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\QuoteController;
+use App\Http\Controllers\Api\CategoryController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -116,11 +118,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // Vendedores de una compañía específica
     });
     Route::prefix('categories')->group(function () {
-        Route::get('/', [ProductController::class, 'index']);
-        Route::post('/', [ProductController::class, 'store']);
-        Route::get('{id}', [ProductController::class, 'show']);
-        Route::put('{id}', [ProductController::class, 'update']);
-        Route::delete('{id}', [ProductController::class, 'destroy']);
+        Route::get('/', [CategoryController::class, 'index']);
+        Route::post('/', [CategoryController::class, 'store']);
+        Route::get('{id}', [CategoryController::class, 'show']);
+        Route::put('{id}', [CategoryController::class, 'update']);
+        Route::delete('{id}', [CategoryController::class, 'destroy']);
         
         // Vendedores de una compañía específica
     });

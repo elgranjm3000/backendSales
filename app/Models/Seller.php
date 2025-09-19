@@ -63,7 +63,8 @@ class Seller extends Model
      */
     public function company()
     {
-        return $this->belongsTo(Company::class);
+        //return $this->hasMany(Company::class);
+       return $this->belongsTo(Company::class); 
     }
 
     /**

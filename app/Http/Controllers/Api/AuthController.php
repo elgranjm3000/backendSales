@@ -292,8 +292,11 @@ class AuthController extends Controller
         }
 
         // Obtener la licencia desde KeySystemItem relacionado
-        $licenseKey = $company->key_system_items_id;        
-        $companyLicense = Company::with('keySystemItem')->find($licenseKey);        
+        $licenseKey = $company->key_system_items_id;      
+        //$companyLicense = Company::with('keySystemItem')->find($licenseKey);        
+        $companyLicense = Company::with('keySystemItem')->active()->get()->first();
+
+
         $partialLicense = $this->maskLicense($companyLicense->keySystemItem->key_activation);
 
         return response()->json([

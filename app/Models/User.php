@@ -23,7 +23,7 @@ class User extends Authenticatable
         'role',
         'status',
         'avatar',
-        'password',
+        'password'
     ];
 
     /**
@@ -72,6 +72,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(Seller::class);
     }
+
+    public function quotes()
+    {
+        return $this->hasMany(Quote::class, 'user_seller_id', 'id');
+    }
+
 
     /**
      * Scopes para filtrar por rol

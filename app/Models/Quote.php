@@ -12,7 +12,11 @@ class Quote extends Model
     protected $fillable = [
         'quote_number', 'customer_id', 'company_id', 'subtotal', 'tax',
         'discount', 'total', 'status', 'notes', 'quote_date', 'valid_until',
-        'terms_conditions', 'sent_at', 'approved_at', 'metadata'
+        'terms_conditions', 'sent_at', 'approved_at', 'metadata','user_seller_id',
+        'tax_amount',     
+        'discount_amount',
+        'bcv_rate',
+        'bcv_date'
     ];
 
     protected $casts = [
@@ -24,7 +28,9 @@ class Quote extends Model
         'valid_until' => 'date',
         'sent_at' => 'datetime',
         'approved_at' => 'datetime',
-        'metadata' => 'array'
+        'metadata' => 'array',
+        'tax_amount' => 'decimal:2',      
+        'discount_amount' => 'decimal:2', 
     ];
 
     // Estados del presupuesto
@@ -43,6 +49,17 @@ class Quote extends Model
     {
         return $this->belongsTo(Company::class);
     }
+
+    /*public function users()
+    {
+        return $this->belongsTo(User::class);
+    }*/
+
+    public function seller()
+    {
+        return $this->belongsTo(User::class, 'user_seller_id');
+    }
+
 
     public function items()
     {

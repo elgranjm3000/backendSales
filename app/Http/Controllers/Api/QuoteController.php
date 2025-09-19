@@ -28,8 +28,13 @@ class QuoteController extends Controller
                 break;
             case User::ROLE_SELLER:
                 // Seller solo puede ver sus propias cotizaciones
-                $companyIds = $user->companies->pluck('id');
-                $query->whereIn('company_id', $companyIds);
+                //$companyIds = $user->companies->pluck('id');                
+
+                $companyIds = $user->sellers()->with('company')->pluck('company_id');                
+                $myUser = $user->quotes->pluck('id');                
+                $query->whereIn('company_id', $companyIds)
+                      ->whereIn('id', $myUser);  
+               // dd($query->toSql(), $query->getBindings());                    
                 break;
             default:
                 return response()->json([
@@ -137,7 +142,7 @@ class QuoteController extends Controller
             $tax = 16; // IGV 18%
             $total = $subtotal;
 
-            $quote = Quote::create([
+            $quoteData = [
                 'customer_id' => $request->customer_id,
                 'company_id' => $request->company_id,
                 'tax' => $tax,
@@ -147,8 +152,15 @@ class QuoteController extends Controller
                 'valid_until' => $request->valid_until,
                 'terms_conditions' => $request->terms_conditions,
                 'notes' => $request->notes,
-                'metadata' => $request->metadata ?? []
-            ]);
+                'metadata' => $request->metadata ?? [],                
+                'bcv_rate' => $request->bcv_rate ?? null,
+                'bcv_date' => $request->bcv_date ?? null,
+            ];
+
+            if ($user->role == User::ROLE_SELLER) {
+               $quoteData['user_seller_id'] = $user->id;
+            }
+            $quote = Quote::create($quoteData);
 
             // Crear items del presupuesto
             foreach ($request->items as $item) {
@@ -197,7 +209,9 @@ class QuoteController extends Controller
                 $canView = $user->companies->contains($quote->company_id);
                 break;
             case User::ROLE_SELLER:
-                 $canView = $user->companies->contains($quote->company_id);
+                 //$canView = $user->sellers->contains($quote->company_id);
+                 //dd($canView);
+                 $canView = true;
                 break;
         }
 
@@ -210,7 +224,7 @@ class QuoteController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $quote->load(['customer', 'company', 'items.product'])
+            'data' => $quote->load(['customer', 'company', 'items.product','seller'])
         ]);
     }
 

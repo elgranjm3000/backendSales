@@ -26,7 +26,7 @@ class CustomerController extends Controller
                 });
             });
 
-        $customers = $query->orderBy('name')->paginate($request->per_page ?? 15);
+        $customers = $query->orderBy('name')->get(); //->paginate($request->per_page ?? 15);
 
         return response()->json([
             'success' => true,

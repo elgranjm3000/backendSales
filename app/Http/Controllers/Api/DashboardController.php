@@ -550,13 +550,17 @@ class DashboardController extends Controller
         
         // Métricas de presupuestos para el vendedor
         $quotesToday = Quote::whereIn('company_id', $companyIds)
+                            ->where('user_seller_id', $user->id)
                            ->whereDate('quote_date', today())
                            ->count();
         $quotesThisMonth = Quote::whereIn('company_id', $companyIds)
+                               ->where('user_seller_id', $user->id)
                                ->whereMonth('quote_date', now()->month)
                                ->whereYear('quote_date', now()->year)
                                ->count();
         $customersCount = Customer::whereIn('company_id', $companyIds)->count();
+        $totalCustomers = Customer::whereIn('company_id', $companyIds)->count();
+         $totalQuotes = Quote::whereIn('company_id', $companyIds)->count();
 
         return response()->json([
             'success' => true,
@@ -656,35 +660,37 @@ class DashboardController extends Controller
                     'quotes_goal' => 8,
                     'quotes_completed' => 6
                 ],
-                'recent_quotes' => [
-                    [
-                        'quote_number' => 'COT-2025-012',
-                        'customer' => 'María Rodríguez',
-                        'company' => 'Restaurant El Buen Sabor',
-                        'total' => 125.50,
-                        'status' => 'sent',
-                        'items_count' => 4,
-                        'created_at' => now()->subMinutes(30)->format('Y-m-d H:i:s')
-                    ],
-                    [
-                        'quote_number' => 'COT-2025-011',
-                        'customer' => 'Empresa Tech Solutions',
-                        'company' => 'Restaurant El Buen Sabor',
-                        'total' => 890.00,
-                        'status' => 'approved',
-                        'items_count' => 8,
-                        'created_at' => now()->subHours(2)->format('Y-m-d H:i:s')
-                    ],
-                    [
-                        'quote_number' => 'COT-2025-010',
-                        'customer' => 'Carlos Mendoza',
-                        'company' => 'Café Central',
-                        'total' => 67.80,
-                        'status' => 'draft',
-                        'items_count' => 3,
-                        'created_at' => now()->subHours(4)->format('Y-m-d H:i:s')
-                    ]
+                 'business_summary' => [
+                    'total_customers' => $totalCustomers,
+                    'total_quotes' => $totalQuotes,
+                    'quotes_today' => $quotesToday,
+                    'quotes_this_month' => $quotesThisMonth,
+                    'monthly_revenue' => 28650.95,
+                    'monthly_growth' => '+14.2%',
+                    'pending_orders' => 23,
+                    'today_sales' => 1250.80
                 ],
+                'recent_quotes' => Quote::with(['customer', 'company'])
+                    ->where('user_seller_id', $user->id)
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get()
+                    ->map(function($quote) {
+                        return [
+                            'id' => $quote->id,
+                            'number' => $quote->quote_number,
+                            'customer' => $quote->customer->name ?? 'Cliente no disponible',
+                            'company' => $quote->company->name ?? 'Compañía no disponible',
+                            'total' => $quote->total,
+                            'status' => $quote->status,
+                            'status_label' => $this->getStatusLabel($quote->status),
+                            'date' => $quote->quote_date->format('Y-m-d H:i:s'),
+                            'valid_until' => $quote->valid_until,
+                            'days_remaining' => $quote->valid_until ? now()->diffInDays($quote->valid_until, false) : null,
+                            'created_at' => $quote->created_at->format('Y-m-d H:i:s'),
+                            'items_count' => $quote->items()->count()
+                        ];
+                    }),
                 'recent_sales' => [
                     [
                         'order_id' => 'ORD-2024-001',

@@ -21,6 +21,7 @@ class SellerController extends Controller
         $user = $request->user();
         $query = Seller::with(['user:id,name,email', 'company:id,name']);
 
+
         // Filtrar según el rol del usuario autenticado
         switch ($user->role) {
             case User::ROLE_ADMIN:
@@ -29,7 +30,7 @@ class SellerController extends Controller
                 break;
             case User::ROLE_COMPANY:
                 // Company solo puede ver vendedores de sus compañías
-                $companyIds = $user->companies->pluck('id');                
+                $companyIds = $user->companies->pluck('id');    
                 $query->whereIn('company_id', $request->company_id ? [$request->company_id] : $companyIds);
                 break;
             case User::ROLE_SELLER:
@@ -43,7 +44,9 @@ class SellerController extends Controller
                 ], 403);
         }
 
-        $sellers = $query->orderBy('created_at', 'desc')->paginate(15);
+        $sellers = $query->orderBy('created_at', 'desc')->get();
+                        
+
 
         return response()->json([
             'success' => true,
