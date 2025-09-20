@@ -283,6 +283,7 @@ class SellerController extends Controller
             // Actualizar datos del usuario si se proporcionan
             $userUpdateData = [];
             if ($request->has('name')) $userUpdateData['name'] = $request->name;
+            if ($request->has('seller_status')) $userUpdateData['status'] = $request->seller_status;
             if ($request->has('email')) $userUpdateData['email'] = $request->email;
             if ($request->has('phone')) $userUpdateData['phone'] = $request->phone;
             if ($request->filled('password')) $userUpdateData['password'] = Hash::make($request->password);
