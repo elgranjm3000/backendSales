@@ -1,0 +1,12 @@
+
+RewriteEngine on
+
+RewriteOptions inherit
+
+AddHandler application/x-httpd-php82 .php
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-SSL} !on
+RewriteCond %{HTTP_HOST} ^chrystalmobile\.chrystal\.com\.ve$ [OR]
+RewriteCond %{HTTP_HOST} ^www\.chrystalmobile\.chrystal\.com\.ve$
+RewriteRule ^(.*)$ "https\:\/\/chrystalmobile\.chrystal\.com\.ve\/$1" [R=301,L]
+
