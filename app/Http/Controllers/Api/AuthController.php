@@ -42,7 +42,7 @@ class AuthController extends Controller
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Credenciales incorrectas'
+                'message' => 'Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’'
             ], 401);
         }
 

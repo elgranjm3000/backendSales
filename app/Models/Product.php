@@ -27,6 +27,7 @@ class Product extends Model
         'barcode',
         'weight',
         'attributes',
+        'product_type'
     ];
 
     protected $casts = [
