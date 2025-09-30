@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use App\Mail\PasswordResetMail;
 
 class AuthController extends Controller
 {
@@ -612,4 +613,193 @@ class AuthController extends Controller
         
         return $maskedUsername . '@' . $domain;
     }
+
+
+    public function forgotPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|exists:users,email',
+        ], [
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'Debe ingresar un correo válido.',
+            'email.exists' => 'No existe un usuario registrado con este correo electrónico.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => implode(' | ', $validator->errors()->all()),
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        // Verificar que el usuario esté activo
+        if (!$user->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta cuenta está inactiva. Contacte al administrador.'
+            ], 403);
+        }
+
+        // Generar código de recuperación de 6 dígitos
+        $resetCode = $this->generateValidationCode();
+        
+        // Guardar código en Cache con clave única (15 minutos)
+        $cacheKey = "password_reset_{$user->id}_{$user->email}";
+        Cache::put($cacheKey, [
+            'code' => $resetCode,
+            'user_id' => $user->id,
+            'created_at' => now()
+        ], 15 * 60); // 15 minutos
+
+        // Enviar email con código de recuperación
+        try {
+            Mail::to($user->email)->send(new PasswordResetMail($resetCode, $user));
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Se ha enviado un código de recuperación a su correo electrónico',
+                'data' => [
+                    'email' => $this->maskEmail($user->email),
+                    'expires_in_minutes' => 15
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar el código de recuperación. Intente nuevamente.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'reset_token' => 'required|string',
+            'email' => 'required|email|exists:users,email',
+            'password' => 'required|string|min:8|confirmed',
+        ], [
+            'reset_token.required' => 'Token de recuperación es obligatorio.',
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'Debe ingresar un correo válido.',
+            'email.exists' => 'No existe un usuario con este correo.',
+            'password.required' => 'La contraseña es obligatoria.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.confirmed' => 'Las contraseñas no coinciden.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => implode(' | ', $validator->errors()->all()),
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $tokenKey = "reset_token_{$user->id}";
+        $storedData = Cache::get($tokenKey);
+
+        if (!$storedData || $storedData['token'] !== $request->reset_token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token de recuperación inválido o expirado',
+                'code' => 'INVALID_TOKEN'
+            ], 422);
+        }
+
+        // Verificar que el email coincida
+        if ($storedData['email'] !== $request->email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token no válido para este correo electrónico',
+                'code' => 'TOKEN_MISMATCH'
+            ], 422);
+        }
+
+        try {
+            // Actualizar la contraseña
+            $user->update([
+                'password' => Hash::make($request->password)
+            ]);
+
+            // Eliminar el token de reset
+            Cache::forget($tokenKey);
+
+            // Revocar todos los tokens existentes del usuario (opcional, por seguridad)
+            $user->tokens()->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Contraseña restablecida exitosamente. Ahora puede iniciar sesión con su nueva contraseña.'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al restablecer la contraseña: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+     public function verifyResetCode(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|exists:users,email',
+            'code' => 'required|string|size:6',
+        ], [
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'Debe ingresar un correo válido.',
+            'email.exists' => 'No existe un usuario con este correo.',
+            'code.required' => 'El código de recuperación es obligatorio.',
+            'code.size' => 'El código debe tener exactamente 6 caracteres.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => implode(' | ', $validator->errors()->all()),
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $cacheKey = "password_reset_{$user->id}_{$user->email}";
+        $storedData = Cache::get($cacheKey);
+
+        if (!$storedData || $storedData['code'] !== $request->code) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Código de recuperación inválido o expirado',
+                'code' => 'INVALID_CODE'
+            ], 422);
+        }
+
+        // Código válido - generar token temporal para el reset
+        $resetToken = Str::random(64);
+        $tokenKey = "reset_token_{$user->id}";
+        
+        Cache::put($tokenKey, [
+            'token' => $resetToken,
+            'user_id' => $user->id,
+            'email' => $user->email
+        ], 30 * 60); // 30 minutos para completar el reset
+
+        // Eliminar el código de verificación
+        Cache::forget($cacheKey);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Código verificado correctamente. Ahora puede establecer su nueva contraseña.',
+            'data' => [
+                'reset_token' => $resetToken,
+                'expires_in_minutes' => 30
+            ]
+        ]);
+    }
+
 }

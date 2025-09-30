@@ -79,6 +79,11 @@ use App\Http\Controllers\Api\CategoryController;
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 });
+
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/auth/verify-reset-code', [AuthController::class, 'verifyResetCode']);
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+
 Route::post('/users/check', [AuthController::class, 'checkCompanyInfo']);
 Route::post('/users/stepConfirm', [AuthController::class, 'confirmCompanyRegistration']);
 Route::post('/users/validateCompanyCode', [AuthController::class, 'validateCompanyCode']);
