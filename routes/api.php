@@ -99,7 +99,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Rutas de autenticación
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
+        Route::post('/logout-all-devices', [AuthController::class, 'logoutAllDevices']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::get('/active-sessions', [AuthController::class, 'activeSessions']);
+
     });
 
     // Rutas de usuarios

@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
 
+         $middleware->alias([
+            'check.active.session' => \App\Http\Middleware\CheckActiveSession::class,
+        ]);
+
         // IMPORTANTE: Excluir rutas API del CSRF
         $middleware->validateCsrfTokens(except: [
             'api/*',

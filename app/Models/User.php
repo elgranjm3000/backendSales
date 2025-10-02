@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\ActiveSession;
 
 class User extends Authenticatable
 {
@@ -135,5 +136,45 @@ class User extends Authenticatable
     public function isActive()
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+
+    public function activeSessions()
+    {
+        return $this->hasMany(ActiveSession::class);
+    }
+
+    /**
+     * Verificar si el usuario tiene una sesión activa
+     */
+    public function hasActiveSession(): bool
+    {
+        return $this->activeSessions()->active()->exists();
+    }
+
+    /**
+     * Obtener la sesión activa del usuario
+     */
+    public function getActiveSession()
+    {
+        return $this->activeSessions()->active()->first();
+    }
+
+    /**
+     * Terminar todas las sesiones activas del usuario
+     */
+    public function terminateAllSessions(): void
+    {
+        $this->activeSessions()->delete();
+        $this->tokens()->delete();
+    }
+
+    /**
+     * Terminar sesión específica
+     */
+    public function terminateSession($tokenId): void
+    {
+        $this->activeSessions()->where('token_id', $tokenId)->delete();
+        $this->tokens()->where('id', $tokenId)->delete();
     }
 }

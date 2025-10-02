@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use App\Mail\PasswordResetMail;
+use App\Models\ActiveSession;
 
 class AuthController extends Controller
 {
@@ -27,6 +28,9 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required',
+            'device_name' => 'sometimes|string|max:255',
+            'device_type' => 'sometimes|in:web,mobile,tablet',
+            'force_logout' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -54,7 +58,49 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        // Verificar sesión activa
+    $activeSession = $user->getActiveSession();
+    
+    if ($activeSession) {
+        if ($request->boolean('force_logout', false)) {
+            $user->terminateAllSessions();
+        } else {
+            return response()->json([
+                'success' => false,
+                'code' => 'ACTIVE_SESSION_EXISTS',
+                'message' => 'Ya existe una sesión activa en otro dispositivo. Por favor, cierre la sesión antes de continuar.',
+                'data' => [
+                    'active_session' => [
+                        'device_name' => $activeSession->device_name,
+                        'device_type' => $activeSession->device_type,
+                        'ip_address' => $activeSession->ip_address,
+                        'last_activity' => $activeSession->last_activity->format('Y-m-d H:i:s'),
+                        'login_time' => $activeSession->created_at->format('Y-m-d H:i:s')
+                    ]
+                ]
+            ], 409);
+        }
+    }
+
+    // Crear nuevo token
+    $deviceName = $request->device_name ?? 'api-token';
+    $token = $user->createToken($deviceName)->plainTextToken;
+    $tokenParts = explode('|', $token);
+    $tokenId = $tokenParts[0] ?? null;
+
+    // Registrar sesión activa
+    ActiveSession::create([
+        'user_id' => $user->id,
+        'token_id' => $tokenId,
+        'device_name' => $deviceName,
+        'device_type' => $request->device_type ?? 'web',
+        'ip_address' => $request->ip(),
+        'user_agent' => $request->userAgent(),
+        'last_activity' => now(),
+        'expires_at' => now()->addDays(30),
+    ]);
+
+        //$token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -83,7 +129,14 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        $currentToken = $request->user()->currentAccessToken();
+        
+        ActiveSession::where('user_id', $user->id)
+                    ->where('token_id', $currentToken->id)
+                    ->delete();
+        
+        $currentToken->delete();
 
         return response()->json([
             'success' => true,
@@ -97,6 +150,13 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+    
+        // Actualizar última actividad
+        $currentToken = $request->user()->currentAccessToken();
+        ActiveSession::where('user_id', $user->id)
+                    ->where('token_id', $currentToken->id)
+                    ->first()?->updateActivity();
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -201,6 +261,60 @@ class AuthController extends Controller
                 'created_at' => $newUser->created_at,
             ]
         ], 201);
+    }
+
+
+    public function logoutAllDevices(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe proporcionar su contraseña',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = $request->user();
+
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Contraseña incorrecta'
+            ], 401);
+        }
+
+        $user->terminateAllSessions();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Todas las sesiones han sido cerradas'
+        ]);
+    }
+
+    // Listar sesiones activas
+    public function activeSessions(Request $request)
+    {
+        $user = $request->user();
+        $sessions = $user->activeSessions()->active()->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $sessions->map(function ($session) use ($request) {
+                return [
+                    'id' => $session->id,
+                    'device_name' => $session->device_name,
+                    'device_type' => $session->device_type,
+                    'ip_address' => $session->ip_address,
+                    'last_activity' => $session->last_activity->format('Y-m-d H:i:s'),
+                    'created_at' => $session->created_at->format('Y-m-d H:i:s'),
+                    'is_current' => $session->token_id == $request->user()->currentAccessToken()->id,
+                ];
+            })
+        ]);
     }
 
     /**
