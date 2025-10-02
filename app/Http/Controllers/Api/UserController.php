@@ -129,7 +129,7 @@ class UserController extends Controller
                 $canView = in_array($targetUser->role, [User::ROLE_COMPANY, User::ROLE_SELLER]);
                 break;
             case User::ROLE_COMPANY:
-                $canView = $targetUser->role === User::ROLE_SELLER;
+                $canView = $targetUser->role === User::ROLE_COMPANY;
                 break;
         }
 
@@ -196,7 +196,7 @@ class UserController extends Controller
                 $canUpdate = in_array($targetUser->role, [User::ROLE_COMPANY, User::ROLE_SELLER]);
                 break;
             case User::ROLE_COMPANY:
-                $canUpdate = $targetUser->role === User::ROLE_SELLER;
+                $canUpdate = $targetUser->role === User::ROLE_COMPANY;
                 break;
         }
 
