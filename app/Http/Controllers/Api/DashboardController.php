@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Seller;
 use App\Models\Quote;
 use App\Models\Customer;
+use App\Models\Product;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -562,6 +563,7 @@ class DashboardController extends Controller
         $customersCount = Customer::where('company_id', $companyId)->count();
         $totalCustomers = Customer::where('company_id', $companyId)->count();
          $totalQuotes = Quote::where('company_id', $companyId)->count();
+         $totalProducts = Product::where('company_id', $companyId)->count();
 
         return response()->json([
             'success' => true,
@@ -669,7 +671,8 @@ class DashboardController extends Controller
                     'monthly_revenue' => 28650.95,
                     'monthly_growth' => '+14.2%',
                     'pending_orders' => 23,
-                    'today_sales' => 1250.80
+                    'today_sales' => 1250.80,
+                    'total_products' => $totalProducts
                 ],
                 'recent_quotes' => Quote::with(['customer', 'company'])
                     ->where('user_seller_id', $user->id)
