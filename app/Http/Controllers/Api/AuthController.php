@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use App\Mail\PasswordResetMail;
 use App\Models\ActiveSession;
+use App\Models\Seller;
 
 class AuthController extends Controller
 {
@@ -601,7 +602,6 @@ class AuthController extends Controller
         }
 
         $company = Company::findOrFail($request->company_id);
-
         // Verificar token de validación en cache
         $tokenKey = "validation_token_{$company->id}";
         $tokenName = $company->name;
@@ -640,6 +640,16 @@ class AuthController extends Controller
             $company->update([
                 'user_id' => $user->id,                
             ]);
+                    $sellers = Seller::where('company_id', $request->company_id)->get();
+
+        
+            foreach ($sellers as $seller) {
+                $seller->update(['status' => 'active','seller_status'=>'active']);                
+                $user = User::find($seller->user_id);                
+                if ($user) {
+                    $user->update(['status' => 'active']);
+                }
+            }
 
             // Limpiar el token de validación
             Cache::forget($tokenKey);
