@@ -33,7 +33,7 @@ class CompanyController extends Controller
                 break;
             case User::ROLE_SELLER:
               //  $query = Seller::with('user:id,name,email');
-                  $seller = Seller::where('user_id', $user->id)->first();
+                  $seller = Seller::where('user_id', $user->id);
                 if ($seller) {
                     $query->where('id', $seller->company_id);
                 } else {

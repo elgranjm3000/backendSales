@@ -640,9 +640,7 @@ class AuthController extends Controller
             $company->update([
                 'user_id' => $user->id,                
             ]);
-                    $sellers = Seller::where('company_id', $request->company_id)->get();
-
-        
+            $sellers = Seller::where('company_id', $request->company_id)->get();        
             foreach ($sellers as $seller) {
                 $seller->update(['status' => 'active','seller_status'=>'active']);                
                 $user = User::find($seller->user_id);                
