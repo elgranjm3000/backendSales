@@ -18,6 +18,8 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $companyId = $request->query('company_id');
+        dd($companyId);
 
         switch ($user->role) {
             case User::ROLE_ADMIN:
