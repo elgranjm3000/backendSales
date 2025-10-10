@@ -35,9 +35,9 @@ class CompanyController extends Controller
               //  $query = Seller::with('user:id,name,email');
                   $seller = Seller::where('user_id', $user->id)->first();
 
-                  dd($seller);
+                  
                 if ($seller) {
-                    $query->where('id', $seller->company_id);
+                    $query->where('user_id', $user->id);
                 } else {
                     // Si el vendedor no está asociado a ninguna compañía, devolver vacío
                     $query->whereRaw('1 = 0');
