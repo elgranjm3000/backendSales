@@ -19,7 +19,6 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $companyId = $request->query('company_id');
-        dd($companyId);
 
         switch ($user->role) {
             case User::ROLE_ADMIN:
@@ -27,9 +26,9 @@ class DashboardController extends Controller
             case User::ROLE_MANAGER:
                 return $this->getManagerDashboard($user);
             case User::ROLE_COMPANY:
-                return $this->getCompanyDashboard($user);
+                return $this->getCompanyDashboard($user,$companyId);
             case User::ROLE_SELLER:
-                return $this->getSellerDashboard($user);
+                return $this->getSellerDashboard($user,$companyId);
             default:
                 return response()->json([
                     'success' => false,
@@ -345,23 +344,23 @@ class DashboardController extends Controller
     /**
      * Dashboard para Company
      */
-    private function getCompanyDashboard($user)
+    private function getCompanyDashboard($user,$companyId)
     {
         $userCompanies = Company::where('user_id', $user->id)->get();
-        $companyIds = $userCompanies->pluck('id');
+        //$companyIds = $userCompanies->pluck('id');
         
-        $totalSellers = Seller::whereIn('company_id', $companyIds)->count();
-        $totalCustomers = Customer::whereIn('company_id', $companyIds)->count();
+        $totalSellers = Seller::where('company_id', $companyId)->count();
+        $totalCustomers = Customer::where('company_id', $companyId)->count();
         
         // Métricas de presupuestos para la compañía
-        $quotesToday = Quote::whereIn('company_id', $companyIds)
+        $quotesToday = Quote::where('company_id', $companyId)
                            ->whereDate('quote_date', today())
                            ->count();
-        $quotesThisMonth = Quote::whereIn('company_id', $companyIds)
+        $quotesThisMonth = Quote::where('company_id', $companyId)
                                ->whereMonth('quote_date', now()->month)
                                ->whereYear('quote_date', now()->year)
                                ->count();
-        $totalQuotes = Quote::whereIn('company_id', $companyIds)->count();
+        $totalQuotes = Quote::where('company_id', $companyId)->count();
 
         return response()->json([
             'success' => true,
@@ -384,7 +383,7 @@ class DashboardController extends Controller
                     'today_sales' => 1250.80
                 ],
                  'recent_quotes' => Quote::with(['customer', 'company'])
-                    ->whereIn('company_id', $companyIds)
+                    ->where('company_id', $companyId)
                     ->orderBy('created_at', 'desc')
                     ->limit(8)
                     ->get()
@@ -408,37 +407,37 @@ class DashboardController extends Controller
                 'quote_metrics' => [
                     'today' => [
                         'count' => $quotesToday,
-                        'total_amount' => Quote::whereIn('company_id', $companyIds)
+                        'total_amount' => Quote::where('company_id', $companyId)
                                               ->whereDate('quote_date', today())
                                               ->sum('total'),
-                        'pending_count' => Quote::whereIn('company_id', $companyIds)
+                        'pending_count' => Quote::where('company_id', $companyId)
                                                ->where('status', 'draft')
                                                ->count()
                     ],
                     'this_month' => [
                         'count' => $quotesThisMonth,
-                        'total_amount' => Quote::whereIn('company_id', $companyIds)
+                        'total_amount' => Quote::where('company_id', $companyId)
                                               ->whereMonth('quote_date', now()->month)
                                               ->whereYear('quote_date', now()->year)
                                               ->sum('total'),
-                        'approved_count' => Quote::whereIn('company_id', $companyIds)
+                        'approved_count' => Quote::where('company_id', $companyId)
                                                 ->where('status', 'approved')
                                                 ->whereMonth('approved_at', now()->month)
                                                 ->whereYear('approved_at', now()->year)
                                                 ->count()
                     ],
                     'by_status' => [
-                        'draft' => Quote::whereIn('company_id', $companyIds)->where('status', 'draft')->count(),
-                        'sent' => Quote::whereIn('company_id', $companyIds)->where('status', 'sent')->count(),
-                        'approved' => Quote::whereIn('company_id', $companyIds)->where('status', 'approved')->count(),
-                        'rejected' => Quote::whereIn('company_id', $companyIds)->where('status', 'rejected')->count(),
-                        'expired' => Quote::whereIn('company_id', $companyIds)->where('status', 'expired')->count()
+                        'draft' => Quote::where('company_id', $companyId)->where('status', 'draft')->count(),
+                        'sent' => Quote::where('company_id', $companyId)->where('status', 'sent')->count(),
+                        'approved' => Quote::where('company_id', $companyId)->where('status', 'approved')->count(),
+                        'rejected' => Quote::where('company_id', $companyId)->where('status', 'rejected')->count(),
+                        'expired' => Quote::where('company_id', $companyId)->where('status', 'expired')->count()
                     ]
                 ],
                 'customer_overview' => [
                     'total' => $totalCustomers,
-                    'active' => Customer::whereIn('company_id', $companyIds)->where('status', 'active')->count(),
-                    'new_this_month' => Customer::whereIn('company_id', $companyIds)
+                    'active' => Customer::where('company_id', $companyId)->where('status', 'active')->count(),
+                    'new_this_month' => Customer::where('company_id', $companyId)
                                               ->whereMonth('created_at', now()->month)
                                               ->whereYear('created_at', now()->year)
                                               ->count()
@@ -545,24 +544,24 @@ class DashboardController extends Controller
     /**
      * Dashboard para Seller
      */
-    private function getSellerDashboard($user)
+    private function getSellerDashboard($user,$companyId)
     {
         $sellerRecords = Seller::where('user_id', $user->id)->with('company')->get();
-        $companyIds = $sellerRecords->pluck('company_id');
+        //$companyIds = $sellerRecords->pluck('company_id');
         
         // Métricas de presupuestos para el vendedor
-        $quotesToday = Quote::whereIn('company_id', $companyIds)
+        $quotesToday = Quote::where('company_id', $companyId)
                             ->where('user_seller_id', $user->id)
                            ->whereDate('quote_date', today())
                            ->count();
-        $quotesThisMonth = Quote::whereIn('company_id', $companyIds)
+        $quotesThisMonth = Quote::where('company_id', $companyId)
                                ->where('user_seller_id', $user->id)
                                ->whereMonth('quote_date', now()->month)
                                ->whereYear('quote_date', now()->year)
                                ->count();
-        $customersCount = Customer::whereIn('company_id', $companyIds)->count();
-        $totalCustomers = Customer::whereIn('company_id', $companyIds)->count();
-         $totalQuotes = Quote::whereIn('company_id', $companyIds)->count();
+        $customersCount = Customer::where('company_id', $companyId)->count();
+        $totalCustomers = Customer::where('company_id', $companyId)->count();
+         $totalQuotes = Quote::where('company_id', $companyId)->count();
 
         return response()->json([
             'success' => true,
@@ -587,22 +586,22 @@ class DashboardController extends Controller
                 'quote_performance' => [
                     'today' => [
                         'count' => $quotesToday,
-                        'total_amount' => Quote::whereIn('company_id', $companyIds)
+                        'total_amount' => Quote::where('company_id', $companyId)
                                               ->whereDate('quote_date', today())
                                               ->sum('total'),
-                        'approved' => Quote::whereIn('company_id', $companyIds)
+                        'approved' => Quote::where('company_id', $companyId)
                                           ->where('status', 'approved')
                                           ->whereDate('approved_at', today())
                                           ->count()
                     ],
                     'this_month' => [
                         'count' => $quotesThisMonth,
-                        'total_amount' => Quote::whereIn('company_id', $companyIds)
+                        'total_amount' => Quote::where('company_id', $companyId)
                                               ->whereMonth('quote_date', now()->month)
                                               ->whereYear('quote_date', now()->year)
                                               ->sum('total'),
                         'conversion_rate' => $quotesThisMonth > 0 ? 
-                            round((Quote::whereIn('company_id', $companyIds)
+                            round((Quote::where('company_id', $companyId)
                                        ->where('status', 'approved')
                                        ->whereMonth('approved_at', now()->month)
                                        ->whereYear('approved_at', now()->year)
@@ -611,11 +610,11 @@ class DashboardController extends Controller
                 ],
                 'customer_metrics' => [
                     'total_served' => $customersCount,
-                    'new_this_month' => Customer::whereIn('company_id', $companyIds)
+                    'new_this_month' => Customer::where('company_id', $companyId)
                                               ->whereMonth('created_at', now()->month)
                                               ->whereYear('created_at', now()->year)
                                               ->count(),
-                    'active_customers' => Customer::whereIn('company_id', $companyIds)
+                    'active_customers' => Customer::where('company_id', $companyId)
                                                 ->where('status', 'active')
                                                 ->count()
                 ],
