@@ -33,11 +33,11 @@ class CompanyController extends Controller
                 break;
             case User::ROLE_SELLER:
               //  $query = Seller::with('user:id,name,email');
-                  $seller = Seller::where('user_id', $user->id)->first();
-
-                  
+                $seller = Seller::where('user_id', $user->id)->get();                  
                 if ($seller) {
-                    $query->where('user_id', $user->id);
+                    //$query->where('id', $seller->company_id);
+                    $companyIds = $seller->pluck('company_id')->unique();
+                    $query->whereIn('id', $companyIds);
                 } else {
                     // Si el vendedor no está asociado a ninguna compañía, devolver vacío
                     $query->whereRaw('1 = 0');
