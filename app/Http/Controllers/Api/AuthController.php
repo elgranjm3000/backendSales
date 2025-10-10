@@ -25,41 +25,55 @@ class AuthController extends Controller
      * Login de usuario
      */
     public function login(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required',
-            'device_name' => 'sometimes|string|max:255',
-            'device_type' => 'sometimes|in:web,mobile,tablet',
-            'force_logout' => 'sometimes|boolean',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email',
+        'password' => 'required',
+        'device_name' => 'sometimes|string|max:255',
+        'device_type' => 'sometimes|in:web,mobile,tablet',
+        'force_logout' => 'sometimes|boolean',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Datos de validación incorrectos',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Datos de validación incorrectos',
+            'errors' => $validator->errors()
+        ], 422);
+    }
 
-        $user = User::with('companies')->where('email', $request->email)->first();
+    // Cargar relaciones según el rol del usuario
+    $user = User::where('email', $request->email)->first();
 
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a 'Crear cuenta''
+        ], 401);
+    }
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’'
-            ], 401);
-        }
+    // Cargar relaciones según el rol
+    if ($user->role === User::ROLE_COMPANY) {
+        $user->load('companies');
+    } elseif ($user->role === User::ROLE_SELLER) {
+        $user->load('sellers.company');
+    }
 
-        if (!$user->isActive()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Usuario inactivo'
-            ], 403);
-        }
+    if (!Hash::check($request->password, $user->password)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a 'Crear cuenta''
+        ], 401);
+    }
 
-        // Verificar sesión activa
+    if (!$user->isActive()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Usuario inactivo'
+        ], 403);
+    }
+
+    // Verificar sesión activa
     $activeSession = $user->getActiveSession();
     
     if ($activeSession) {
@@ -101,29 +115,43 @@ class AuthController extends Controller
         'expires_at' => now()->addDays(30),
     ]);
 
-        //$token = $user->createToken('api-token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login exitoso',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'status' => $user->status,
-                    'companies' => $user->companies->map(function ($company) {
-                        return [
-                            'id' => $company->id,
-                            'name' => $company->name,                           
-                        ];
-                    }),
-                ],
-                'token' => $token
-            ]
-        ]);
+    // Preparar datos de companies según el rol
+    $companiesData = [];
+    
+    if ($user->role === User::ROLE_COMPANY) {
+        $companiesData = $user->companies->map(function ($company) {
+            return [
+                'id' => $company->id,
+                'name' => $company->name,
+            ];
+        });
+    } elseif ($user->role === User::ROLE_SELLER) {
+        $companiesData = $user->sellers->map(function ($seller) {
+            return [
+                'id' => $seller->company->id,
+                'name' => $seller->company->name,
+                'seller_id' => $seller->id,
+                'seller_code' => $seller->code,
+            ];
+        });
     }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Login exitoso',
+        'data' => [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'status' => $user->status,
+                'companies' => $companiesData,
+            ],
+            'token' => $token
+        ]
+    ]);
+}
 
     /**
      * Logout de usuario
