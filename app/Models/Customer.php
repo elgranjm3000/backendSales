@@ -26,6 +26,7 @@ class Customer extends Model
         'longitude',
         'status',
         'additional_info',
+        'contact',
     ];
 
     protected $casts = [
