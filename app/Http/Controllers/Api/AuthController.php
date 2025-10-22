@@ -44,11 +44,18 @@ class AuthController extends Controller
 
         $user = User::with('companies')->where('email', $request->email)->first();
 
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if(!$user){
             return response()->json([
                 'success' => false,
                 'message' => 'Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’'
+            ], 401);
+        }
+
+
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => '"Error de acceso" Lo sentimos, estas credenciales no son válidas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’'
             ], 401);
         }
 
