@@ -27,13 +27,21 @@ class Product extends Model
         'barcode',
         'weight',
         'attributes',
-        'product_type'
+        'product_type',
+        'higher_price',
+        'sale_tax',
+        'aliquot',
+        'coin',
+        'description_coin',
+        'unitary_cost',
+        'buy_tax',
+        'buy_aliquot'
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
-        'cost' => 'decimal:2',
-        'weight' => 'decimal:3',
+        'price' => 'decimal:6',
+        'cost' => 'decimal:6',
+        'weight' => 'decimal:6',
         'stock' => 'integer',
         'min_stock' => 'integer',
         'images' => 'array',

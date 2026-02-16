@@ -15,21 +15,40 @@ class ProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Product::with(['company', 'category'])
-            ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
-            ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->low_stock, fn($q) => $q->lowStock())
-            ->when($request->search, fn($q) => $q->search($request->search));
+         try {
+          $perPage = min(50, (int)($request->per_page ?? 50));
 
-        $products = $query->orderBy('name')->get(); //->paginate($request->per_page ?? 15);
+          $query = Product::query()
+              ->with(['company:id,name', 'category:id,description'])
+              ->where('status', 'active')
+              ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
+              ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
+              ->when($request->status, fn($q) => $q->where('status', $request->status))
+              ->when($request->low_stock, fn($q) => $q->lowStock())
+              ->when($request->search, fn($q) => $q->search($request->search));
 
-        return response()->json([
-            'success' => true,
-            'data' => $products,
-            'message' => 'Productos obtenidos exitosamente'
-        ]);
-    }
+          $paginated = $query->orderBy('name')->paginate($perPage);
+
+          // ✅ Devolver en formato compatible con el frontend existente
+          return response()->json([
+              'success' => true,
+              'data' => $paginated->items(), // Solo el array de productos
+              'pagination' => [
+                  'current_page' => $paginated->currentPage(),
+                  'per_page' => $paginated->perPage(),
+                  'total' => $paginated->total(),
+              ],
+              'message' => 'Productos obtenidos exitosamente'
+          ]);
+
+      } catch (\Exception $e) {
+          return response()->json([
+              'success' => false,
+              'message' => 'Error: ' . $e->getMessage()
+          ], 500);
+      }
+
+}
 
     /**
      * Crear nuevo producto

@@ -16,21 +16,21 @@ class Quote extends Model
         'tax_amount',     
         'discount_amount',
         'bcv_rate',
-        'bcv_date'
+        'bcv_date',
     ];
 
     protected $casts = [
-        'subtotal' => 'decimal:2',
-        'tax' => 'decimal:2',
-        'discount' => 'decimal:2',
-        'total' => 'decimal:2',
+        'subtotal' => 'decimal:6',
+        'tax' => 'decimal:6',
+        'discount' => 'decimal:6',
+        'total' => 'decimal:6',
         'quote_date' => 'datetime',
         'valid_until' => 'date',
         'sent_at' => 'datetime',
         'approved_at' => 'datetime',
         'metadata' => 'array',
-        'tax_amount' => 'decimal:2',      
-        'discount_amount' => 'decimal:2', 
+        'tax_amount' => 'decimal:6',      
+        'discount_amount' => 'decimal:6', 
     ];
 
     // Estados del presupuesto
@@ -145,7 +145,7 @@ class Quote extends Model
         parent::boot();
 
         static::creating(function ($quote) {
-            $quote->quote_number = 'QUOTE-' . str_pad(static::count() + 1, 8, '0', STR_PAD_LEFT);
+            $quote->quote_number = 'W' . str_pad(static::count() + 1, 10, '0', STR_PAD_LEFT);
             
             // Si no se especifica fecha de validez, por defecto 30 días
             if (!$quote->valid_until) {

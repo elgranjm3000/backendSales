@@ -85,7 +85,7 @@ class QuoteController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $user = auth()->user();
 
@@ -96,10 +96,11 @@ class QuoteController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.buy_tax' => 'required|in:0,1', // ✨ buy_tax: 1=exento, 0=gravable
             'valid_until' => 'nullable|date|after:today',
             'terms_conditions' => 'nullable|string',
             'notes' => 'nullable|string',
-            'discount' => 'nullable|numeric|min:0'
+            'discount' => 'nullable|numeric|min:0|max:100' // ✨ % de descuento
         ]);
 
         // Verificar permisos sobre la compañía
@@ -127,27 +128,107 @@ class QuoteController extends Controller
 
         DB::beginTransaction();
         try {
+            // ✨ CÁLCULO CORRECTO CON buy_tax
             $subtotal = 0;
-            
-            // Calcular subtotal
-            foreach ($request->items as $item) {
-                $itemTotal = $item['quantity'] * $item['unit_price'];
-                if (isset($item['discount'])) {
-                    $itemTotal -= $item['discount'];
-                }
+            $taxableBase = 0;      // ✨ Base sobre la que se cobra IVA (buy_tax = 0)
+            $exemptBase = 0;       // ✨ Base exenta de IVA (buy_tax = 1)
+            $totalesTaxAmount = 0;
+
+            // ✨ PASO 1: Calcular subtotal y separar gravable/exento
+            /*foreach ($request->items as $item) {
+                
+           
+                $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
+                $itemTaxAmout = round(($itemSubtotal * $item['aliquot']) / 100,2);
+                // Aplicar descuento individual si existe
+                $itemDiscount = round($itemSubtotal * (($item['discount_percentage'] ?? 0) / 100),2);
+                $itemTotal = round($itemSubtotal - $itemDiscount,2);
+                
                 $subtotal += $itemTotal;
-            }
+                
 
-            $discount = $request->discount ?? 0;
-            $tax = 16; // IGV 18%
-            $total = $subtotal;
+                
+                // ✨ Separar por buy_tax
+                // buy_tax = 1 → IVA EXENTO (no paga impuesto)
+                // buy_tax = 0 → GRAVABLE (sí paga 16% IVA)
+                if ($item['buy_tax'] == 1) {
+                    $exemptBase += 0;
+                } else {
+                    $taxableBase += $itemTaxAmout;
+                }
+               
+                
+                $totalesTaxAmout = $taxableBase;
+            }*/
+            
+             foreach ($request->items as $item) {
+                  // ✅ MÉTODO DE IMPRESORA FISCAL: Calcular IVA por unidad primero
+            
+                  // Calcular subtotal del item
+                  $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
+            
+                  // Calcular IVA usando el método de impresora fiscal (por unidad)
+                  $itemTaxAmount = 0;
+                  if ($item['buy_tax'] != 1) {  // Si no es exento
+                      $aliquot = $item['aliquot'] ?? 16;
+            
+                      // PASO 1: Calcular IVA por unidad y redondear
+                      $taxPerUnit = round(($item['unit_price'] * $aliquot) / 100, 2);
+            
+                      // PASO 2: Multiplicar por cantidad y redondear
+                      $itemTaxAmount = round($taxPerUnit * $item['quantity'], 2);
+                  }
+            
+                  // Aplicar descuento individual si existe
+                  $itemDiscount = round($itemSubtotal * (($item['discount_percentage'] ?? 0) / 100), 2);
+            
+                  // Calcular total del item (subtotal - descuento + IVA)
+                  $itemTotal = round($itemSubtotal - $itemDiscount + $itemTaxAmount, 2);
+            
+                  // Alternativa: usar los valores calculados por el frontend
+                  // $itemTaxAmount = round($item['tax_amount'] ?? 0, 2);
+                  // $itemDiscount = round($item['discount_amount'] ?? 0, 2);
+                  // $itemTotal = round($item['total'] ?? ($itemSubtotal - $itemDiscount + $itemTaxAmount), 2);
+            
+                  $subtotal += $itemSubtotal;
+            
+                  // ✅ Separar por buy_tax
+                  // buy_tax = 1 → IVA EXENTO (no paga impuesto)
+                  // buy_tax = 0 → GRAVABLE (sí paga IVA)
+                  if ($item['buy_tax'] == 1) {
+                      $exemptBase += 0;
+                  } else {
+                      $taxableBase += $itemTaxAmount;
+                  }
+                  
+                  $totalesTaxAmount = $taxableBase;
+              }
 
+
+            // ✨ PASO 2: Aplicar descuento general (% sobre todo)
+            $discountPercentage = $request->discount ?? 0;
+            $discountAmount = ($subtotal * $discountPercentage) / 100;
+            
+            // ✨ PASO 3: Calcular base gravable DESPUÉS del descuento
+            $finalTaxableBase = max(0, $taxableBase - $discountAmount);
+            
+            // ✨ PASO 4: Calcular IVA (16%) SOLO sobre lo gravable
+            $taxAmount = $finalTaxableBase * 0.16;
+            
+            // ✨ PASO 5: Calcular total final
+            $total = ($subtotal - $discountAmount)+$totalesTaxAmount;
+
+            // ✨ DATOS PARA GUARDAR
             $quoteData = [
                 'customer_id' => $request->customer_id,
                 'company_id' => $request->company_id,
-                'tax' => $tax,
-                'discount' => $discount,
-                'status' => Quote::STATUS_DRAFT,
+                'tax' => 16,  // IVA rate (16%)
+                'tax_amount' => $totalesTaxAmount,  // ✨ Monto real de impuesto
+                'discount' => $discountPercentage,  // ✨ % de descuento
+                'discount_amount' => $discountAmount,  // ✨ Monto real de descuento
+                'subtotal' => $subtotal,  // ✨ Guardamos también el subtotal
+                'total' => $total,  // ✨ Total final
+                'status' => $request->status ?? 'pending',
                 'quote_date' => now(),
                 'valid_until' => $request->valid_until,
                 'terms_conditions' => $request->terms_conditions,
@@ -155,22 +236,34 @@ class QuoteController extends Controller
                 'metadata' => $request->metadata ?? [],                
                 'bcv_rate' => $request->bcv_rate ?? null,
                 'bcv_date' => $request->bcv_date ?? null,
+                
             ];
 
             if ($user->role == User::ROLE_SELLER) {
-               $quoteData['user_seller_id'] = $user->id;
+                $quoteData['user_seller_id'] = $user->id;
             }
+
             $quote = Quote::create($quoteData);
 
-            // Crear items del presupuesto
-            foreach ($request->items as $item) {
+            // ✨ PASO 6: Crear items del presupuesto con buy_tax
+             foreach ($request->items as $item) {
+                $itemSubtotal = $item['quantity'] * $item['unit_price'];
+                $itemTaxAmout = ($itemSubtotal * $item['aliquot']) / 100;
+                $itemDiscount = $itemSubtotal * (($item['discount_percentage'] ?? 0) / 100);
+                $itemTotal = ($itemSubtotal - $itemDiscount)+$itemTaxAmout;
+               
+
                 $quote->items()->create([
                     'product_id' => $item['product_id'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
-                    'total' => $item['quantity'] * $item['unit_price'],
-                    'discount_percentage' => $item['discount'] ?? 0,
+                    'total' => round($itemTotal, 2),  // ✨ Total DESPUÉS del descuento individual
+                    'discount_percentage' => $item['discount_percentage'] ?? 0,
                     'name' => $item['name'] ?? null,
+                    'buy_tax' => $item['buy_tax'],  // ✨ 1aliquot
+                    'tax_percentage'=>$item['aliquot'],
+                    'tax_amount' => $itemTaxAmout,
+                    'type_price' => $item['type_price'] ?? null,
                 ]);
             }
 
@@ -179,11 +272,23 @@ class QuoteController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Cotización creada exitosamente',
-                'data' => $quote->load(['customer', 'company', 'items.product'])
+                'data' => $quote->load(['customer', 'company', 'items.product']),
+                // ✨ Información de cálculo para debugging
+                'calculation_info' => [
+                    'subtotal' => round($subtotal, 2),
+                    'taxable_base' => round($taxableBase, 2),
+                    'exempt_base' => round($exemptBase, 2),
+                    'discount_percentage' => $discountPercentage,
+                    'discount_amount' => round($discountAmount, 2),
+                    'final_taxable_base' => round($finalTaxableBase, 2),
+                    'tax_amount' => round($taxAmount, 2),
+                    'total' => round($total, 2),
+                ]
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Error creating quote: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error al crear la cotización: ' . $e->getMessage()

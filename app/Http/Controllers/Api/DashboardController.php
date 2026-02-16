@@ -362,7 +362,7 @@ class DashboardController extends Controller
                                ->whereYear('quote_date', now()->year)
                                ->count();
         $totalQuotes = Quote::where('company_id', $companyId)->count();
-         $totalProducts = Product::where('company_id', $companyId)->count();
+         $totalProducts = Product::where('company_id', $companyId)->where('status', 'active')->count();
 
         return response()->json([
             'success' => true,
@@ -565,7 +565,7 @@ class DashboardController extends Controller
         $customersCount = Customer::where('company_id', $companyId)->count();
         $totalCustomers = Customer::where('company_id', $companyId)->count();
          $totalQuotes = Quote::where('company_id', $companyId)->count();
-         $totalProducts = Product::where('company_id', $companyId)->count();
+         $totalProducts = Product::where('company_id', $companyId)->where('status', 'active')->count();
 
         return response()->json([
             'success' => true,
