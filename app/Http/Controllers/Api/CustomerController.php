@@ -26,7 +26,7 @@ class CustomerController extends Controller
                 });
             });
 
-        $customers = $query->orderBy('name')->get(); //->paginate($request->per_page ?? 15);
+        $customers = $query->orderBy('name')->paginate($request->per_page ?? 100);
 
         return response()->json([
             'success' => true,
@@ -43,11 +43,20 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:customers,email',
+            'email' => 'required|email',
             'phone' => 'nullable|string|max:255',
             'document_type' => 'nullable|string|max:255',
             'document_number' => 'nullable|string|max:255',
+            'codigo' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('customers')->where(function ($query) use ($request) {
+                    return $query->where('company_id', $request->company_id);
+                }),
+            ],
             'address' => 'nullable|string|max:255',
+            'contact' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
             'zip_code' => 'nullable|string|max:255',
@@ -55,6 +64,10 @@ class CustomerController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
             'status' => 'sometimes|string|max:255',
             'additional_info' => 'nullable|array'
+        ],[
+            'codigo.unique' => 'El código proporcionado ya está registrado para otro cliente.',
+            'email.required' => 'El email es requerido.',
+            'name.required'=>'Su nombre es requerido'
         ]);
 
         $customer = Customer::create($validated);

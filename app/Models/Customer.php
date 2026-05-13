@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Enums\GenericStatus;
 
 class Customer extends Model
 {
@@ -27,12 +28,14 @@ class Customer extends Model
         'status',
         'additional_info',
         'contact',
+        'codigo',
     ];
 
     protected $casts = [
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
         'additional_info' => 'array',
+        'status' => GenericStatus::class,
     ];
 
     /**
@@ -56,7 +59,7 @@ class Customer extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->where('status', GenericStatus::ACTIVE->value);
     }
 
     /**
@@ -85,7 +88,7 @@ class Customer extends Model
         if ($this->city) $address[] = $this->city;
         if ($this->state) $address[] = $this->state;
         if ($this->zip_code) $address[] = $this->zip_code;
-        
+
         return implode(', ', $address);
     }
 }

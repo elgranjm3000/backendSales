@@ -43,26 +43,64 @@ class AuthController extends Controller
         }
 
         $user = User::with('companies')->where('email', $request->email)->first();
+    
 
         if(!$user){
+            $message = "Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’ ";
+            
+            
+            if ($request->device_name === 'config-test' or $request->device_name === 'sync-system' or $request->device_name === 'tray_auth'  or $request->device_name === 'config_auth') {
+                $message = "Lo sentimos, estas credenciales no están registradas.";
+            }
             return response()->json([
                 'success' => false,
-                'message' => 'Lo sentimos, estas credenciales no están registradas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’'
+                'message' => $message
             ], 401);
         }
+        
+            if ($request->device_name === 'config-test' or $request->device_name === 'sync-system' or $request->device_name === 'tray_auth' or $request->device_name === 'config_auth') {
+                $message = "Lo sentimos, estas credenciales no están registradas.";
+            }
 
 
         if (!Hash::check($request->password, $user->password)) {
+            
+            $message = '"Error de acceso" Lo sentimos, estas credenciales no son válidas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’';
+            
+            if ($request->device_name === 'config-test' or $request->device_name === 'sync-system' or $request->device_name === 'tray_auth' or $request->device_name === 'config_auth') {
+                $message = '"Error de acceso" Lo sentimos, estas credenciales no son válidas.';
+            }
             return response()->json([
                 'success' => false,
-                'message' => '"Error de acceso" Lo sentimos, estas credenciales no son válidas. Si es la primera vez que ingresa, deberá ir a ‘Crear cuenta’'
+                'message' => $message
             ], 401);
         }
+        
+         if ($request->device_name === 'config-test' AND $user->role != \App\Enums\UserRole::ADMIN){
+                return response()->json([
+                    'success' => false,
+                    'message' => '"Error de acceso" Lo sentimos, estas credenciales no son válidas.'
+                ], 401); 
+             
+         }
+         
+         
+         if ($request->device_name === 'config_auth' AND $user->role != \App\Enums\UserRole::CAJERO){
+                 
+                    return response()->json([
+                        'success' => false,
+                        'message' => '"Error de acceso" Lo sentimos, estas credenciales no son válidas.'
+                    ], 401); 
+             
+         }
+         
+         
+         
 
 
-        if ($user->role === User::ROLE_COMPANY) {
+        if ($user->role === \App\Enums\UserRole::COMPANY) {
             $user->load('companies');
-        } elseif ($user->role === User::ROLE_SELLER) {
+        } elseif ($user->role === \App\Enums\UserRole::SELLER) {
             $user->load('sellers.company');
         }
 
@@ -75,8 +113,9 @@ class AuthController extends Controller
 
         // Verificar sesión activa
     $activeSession = $user->getActiveSession();
+    $isDemoUser = ($user->email === 'demo@test.com');
     
-    if ($activeSession) {
+    if ($activeSession && !$isDemoUser) {
         if ($request->boolean('force_logout', false)) {
             $user->terminateAllSessions();
         } else {
@@ -97,9 +136,67 @@ class AuthController extends Controller
         }
     }
 
-    // Crear nuevo token
+    // Crear nuevo token con expiración basada en suscripción
     $deviceName = $request->device_name ?? 'api-token';
-    $token = $user->createToken($deviceName)->plainTextToken;
+
+    // Obtener suscripción activa del usuario
+    $subscriptions = $user->activeSubscription();
+
+    // Determinar fecha de expiración del token
+    $tokenExpiresAt = now()->addDays(30); // Por defecto 30 días
+    $subscriptionData = null;
+
+    /*if ($subscription) {
+        // El token expira cuando expire la suscripción
+        $tokenExpiresAt = $subscription->expires_at;
+
+        $subscriptionData = [
+            'plan' => $subscription->plan,
+            'plan_name' => $subscription->plan_name,
+            'status' => $subscription->status,
+            'expires_at' => $subscription->expires_at?->toIso8601String(),
+            'days_remaining' => $subscription->days_remaining,
+            'features' => $subscription->features,
+            'companies' => $subscription->company,
+        ];
+
+        // Si la suscripción está expirada, marcarla
+        if ($subscription->isExpired()) {
+            $subscription->markAsExpired();
+        }
+    }*/
+    
+    if ($subscriptions && $subscriptions->isNotEmpty()) {
+    // 1. Transformamos la colección a un array estructurado
+    $subscriptionData = $subscriptions->map(function ($sub) {
+        
+        // Ejecutar lógica de expiración si el método existe
+        if (method_exists($sub, 'isExpired') && $sub->isExpired()) {
+            $sub->markAsExpired();
+        }
+
+        return [
+            'plan'           => $sub->plan,
+            'plan_name'      => $sub->plan_name,
+            'status'         => $sub->status,
+            // Si PHP es < 8.0, el ?-> dará error. Usamos una condición normal:
+            'expires_at'     => $sub->expires_at ? $sub->expires_at->toIso8601String() : null,
+            'days_remaining' => $sub->days_remaining,
+            'features'       => $sub->features,
+            'companies'      => $sub->company, 
+        ];
+    })->toArray();
+
+    // 2. Ajustar la expiración del token
+    $maxExpiry = $subscriptions->max('expires_at');
+    if ($maxExpiry) {
+        $tokenExpiresAt = $maxExpiry;
+    }
+}
+
+    // Crear token con fecha de expiración personalizada
+    $tokenResult = $user->createToken($deviceName, ['*'], $tokenExpiresAt);
+    $token = $tokenResult->plainTextToken;
     $tokenParts = explode('|', $token);
     $tokenId = $tokenParts[0] ?? null;
 
@@ -112,20 +209,20 @@ class AuthController extends Controller
         'ip_address' => $request->ip(),
         'user_agent' => $request->userAgent(),
         'last_activity' => now(),
-        'expires_at' => now()->addDays(30),
+        'expires_at' => $tokenExpiresAt,
     ]);
 
         //$token = $user->createToken('api-token')->plainTextToken;
 
         $companiesData = [];
-        if ($user->role === User::ROLE_COMPANY) {
+        if ($user->role === \App\Enums\UserRole::COMPANY) {
                 $companiesData = $user->companies->map(function ($company) {
                     return [
                         'id' => $company->id,
                         'name' => $company->name,
                     ];
                 });
-            } elseif ($user->role === User::ROLE_SELLER) {
+            } elseif ($user->role === \App\Enums\UserRole::SELLER) {
                 $companiesData = $user->sellers->map(function ($seller) {
                     return [
                         'id' => $seller->company->id,
@@ -135,21 +232,31 @@ class AuthController extends Controller
                     ];
                 });
             }
+            
+  
+
+        $responseData = [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'status' => $user->status,
+                'companies' => $companiesData,
+            ],
+            'token' => $token,
+            'token_expires_at' => $tokenExpiresAt?->toIso8601String(),
+        ];
+
+        // Agregar información de suscripción si existe
+        if ($subscriptionData) {
+            $responseData['subscription'] = $subscriptionData;
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Login exitoso',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'status' => $user->status,
-                    'companies' => $companiesData,
-                ],
-                'token' => $token
-            ]
+            'data' => $responseData
         ]);
     }
 
@@ -659,7 +766,7 @@ class AuthController extends Controller
             $user = User::create([
                 'name' =>  $tokenName,
                 'email' => $request->email,
-                'role' => User::ROLE_COMPANY,
+                'role' => \App\Enums\UserRole::COMPANY,
                 'status' => User::STATUS_ACTIVE,
                 'password' => Hash::make($request->password),
             ]);

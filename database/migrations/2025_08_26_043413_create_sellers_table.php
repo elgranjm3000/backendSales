@@ -25,7 +25,7 @@ return new class extends Migration
             $table->double('percent_gerencial_debit_note', 15, 8)->default(0)->comment('Porcentaje nota débito gerencial');
             $table->double('percent_gerencial_credit_note', 15, 8)->default(0)->comment('Porcentaje nota crédito gerencial');
             $table->double('percent_returned_check', 15, 8)->default(0)->comment('Porcentaje cheque devuelto');
-            $table->enum('seller_status', ['active', 'inactive'])->default('active');
+            $table->string('seller_status')->default('active');
             $table->timestamps();
 
             // Índices para optimizar consultas

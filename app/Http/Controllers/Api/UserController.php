@@ -20,16 +20,16 @@ class UserController extends Controller
 
         // Filtrar según el rol del usuario autenticado
         switch ($user->role) {
-            case User::ROLE_ADMIN:
+            case \App\Enums\UserRole::ADMIN:
                 // Admin puede ver todos los usuarios
                 break;
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::MANAGER:
                 // Manager puede ver companies y sellers
-                $query->whereIn('role', [User::ROLE_COMPANY, User::ROLE_SELLER]);
+                $query->whereIn('role', [\App\Enums\UserRole::COMPANY, \App\Enums\UserRole::SELLER]);
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 // Company solo puede ver sellers
-                $query->where('role', User::ROLE_SELLER);
+                $query->where('role', \App\Enums\UserRole::SELLER);
                 break;
             default:
                 return response()->json([
@@ -122,14 +122,14 @@ class UserController extends Controller
         // Verificar permisos para ver el usuario
         $canView = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
+            case \App\Enums\UserRole::ADMIN:
                 $canView = true;
                 break;
-            case User::ROLE_MANAGER:
-                $canView = in_array($targetUser->role, [User::ROLE_COMPANY, User::ROLE_SELLER]);
+            case \App\Enums\UserRole::MANAGER:
+                $canView = in_array($targetUser->role, [\App\Enums\UserRole::COMPANY, \App\Enums\UserRole::SELLER]);
                 break;
-            case User::ROLE_COMPANY:
-                $canView = $targetUser->role === User::ROLE_COMPANY;
+            case \App\Enums\UserRole::COMPANY:
+                $canView = $targetUser->role === \App\Enums\UserRole::COMPANY;
                 break;
         }
 
@@ -189,14 +189,14 @@ class UserController extends Controller
         // Verificar permisos para actualizar
         $canUpdate = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
+            case \App\Enums\UserRole::ADMIN:
                 $canUpdate = true;
                 break;
-            case User::ROLE_MANAGER:
-                $canUpdate = in_array($targetUser->role, [User::ROLE_COMPANY, User::ROLE_SELLER]);
+            case \App\Enums\UserRole::MANAGER:
+                $canUpdate = in_array($targetUser->role, [\App\Enums\UserRole::COMPANY, \App\Enums\UserRole::SELLER]);
                 break;
-            case User::ROLE_COMPANY:
-                $canUpdate = $targetUser->role === User::ROLE_COMPANY;
+            case \App\Enums\UserRole::COMPANY:
+                $canUpdate = $targetUser->role === \App\Enums\UserRole::COMPANY;
                 break;
         }
 
@@ -246,7 +246,7 @@ class UserController extends Controller
         }
 
         // Solo admin puede eliminar usuarios
-        if ($user->role !== User::ROLE_ADMIN) {
+        if ($user->role !== \App\Enums\UserRole::ADMIN) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para eliminar usuarios'

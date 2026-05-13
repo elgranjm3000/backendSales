@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\GenericStatus;
 
 class Seller extends Model
 {
@@ -42,6 +43,7 @@ class Seller extends Model
         'percent_gerencial_credit_note' => 'double',
         'percent_returned_check' => 'double',
         'inkeeper' => 'boolean',
+        'seller_status' => GenericStatus::class,
     ];
 
     /**
@@ -72,7 +74,7 @@ class Seller extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('seller_status', self::STATUS_ACTIVE);
+        return $query->where('seller_status', GenericStatus::ACTIVE->value);
     }
 
     /**
@@ -88,7 +90,7 @@ class Seller extends Model
      */
     public function isActive()
     {
-        return $this->seller_status === self::STATUS_ACTIVE;
+        return $this->seller_status === GenericStatus::ACTIVE;
     }
 
     /**

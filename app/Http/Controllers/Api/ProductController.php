@@ -27,7 +27,10 @@ class ProductController extends Controller
               ->when($request->low_stock, fn($q) => $q->lowStock())
               ->when($request->search, fn($q) => $q->search($request->search));
 
-          $paginated = $query->orderBy('name')->paginate($perPage);
+          //$paginated = $query->orderBy('name')->paginate($perPage);
+          $paginated = $query->reorder()
+                   ->orderByRaw('LOWER(name) ASC')
+                   ->paginate($perPage);
 
           // ✅ Devolver en formato compatible con el frontend existente
           return response()->json([

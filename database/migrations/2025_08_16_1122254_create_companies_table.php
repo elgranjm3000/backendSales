@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('restaurant_image_type')->nullable()->comment('Tipo MIME imagen restaurante');
             $table->binary('main_image')->nullable()->comment('Imagen principal');
             $table->string('main_image_type')->nullable()->comment('Tipo MIME imagen principal');
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->string('status')->default('active');
             $table->timestamps();
 
             // Índices para optimizar consultas

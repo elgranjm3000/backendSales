@@ -19,16 +19,25 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado. Proporciona un token válido.',
+                'error' => 'unauthenticated'
+            ], 401);
+        }
+
         $companyId = $request->query('company_id');
 
         switch ($user->role) {
-            case User::ROLE_ADMIN:
+            case \App\Enums\UserRole::ADMIN:
                 return $this->getAdminDashboard($user);
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::MANAGER:
                 return $this->getManagerDashboard($user);
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 return $this->getCompanyDashboard($user,$companyId);
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 return $this->getSellerDashboard($user,$companyId);
             default:
                 return response()->json([
@@ -133,7 +142,7 @@ class DashboardController extends Controller
                             'company' => $quote->company->name ?? 'Compañía no disponible',
                             'total' => $quote->total,
                             'status' => $quote->status,
-                            'status_label' => $this->getStatusLabel($quote->status),
+                            'status_label' => $this->getStatusLabel($quote->status->value),
                             'date' => $quote->quote_date->format('Y-m-d H:i:s'),
                             'valid_until' => $quote->valid_until,
                             'days_remaining' => $quote->valid_until ? now()->diffInDays($quote->valid_until, false) : null,
@@ -349,10 +358,10 @@ class DashboardController extends Controller
     {
         $userCompanies = Company::where('user_id', $user->id)->get();
         //$companyIds = $userCompanies->pluck('id');
-        
+
         $totalSellers = Seller::where('company_id', $companyId)->count();
         $totalCustomers = Customer::where('company_id', $companyId)->count();
-        
+
         // Métricas de presupuestos para la compañía
         $quotesToday = Quote::where('company_id', $companyId)
                            ->whereDate('quote_date', today())
@@ -362,7 +371,41 @@ class DashboardController extends Controller
                                ->whereYear('quote_date', now()->year)
                                ->count();
         $totalQuotes = Quote::where('company_id', $companyId)->count();
-         $totalProducts = Product::where('company_id', $companyId)->where('status', 'active')->count();
+        $totalProducts = Product::where('company_id', $companyId)->where('status', 'active')->count();
+
+        // ✅ Calcular ingresos REALES del mes actual
+        $monthlyRevenue = Quote::where('company_id', $companyId)
+                             ->whereMonth('quote_date', now()->month)
+                             ->whereYear('quote_date', now()->year)
+                             ->where('status', '!=', 'rejected')
+                             ->sum('total');
+
+        // ✅ Calcular ingresos del mes anterior para el crecimiento
+        $lastMonthRevenue = Quote::where('company_id', $companyId)
+                                 ->whereMonth('quote_date', now()->subMonth()->month)
+                                 ->whereYear('quote_date', now()->subMonth()->year)
+                                 ->where('status', '!=', 'rejected')
+                                 ->sum('total');
+
+        // Calcular porcentaje de crecimiento
+        $monthlyGrowth = 0;
+        if ($lastMonthRevenue > 0) {
+            $monthlyGrowth = (($monthlyRevenue - $lastMonthRevenue) / $lastMonthRevenue) * 100;
+        } elseif ($monthlyRevenue > 0) {
+            $monthlyGrowth = 100; // Crecimiento del 100% si no había ingresos el mes anterior
+        }
+        $monthlyGrowthLabel = $monthlyGrowth >= 0 ? '+' . number_format($monthlyGrowth, 1) : number_format($monthlyGrowth, 1);
+
+        // ✅ Calcular órdenes pendientes (draft + sent)
+        $pendingOrders = Quote::where('company_id', $companyId)
+                             ->whereIn('status', ['draft', 'sent'])
+                             ->count();
+
+        // ✅ Calcular ventas de hoy
+        $todaySales = Quote::where('company_id', $companyId)
+                          ->whereDate('quote_date', today())
+                          ->where('status', '!=', 'rejected')
+                          ->sum('total');
 
         return response()->json([
             'success' => true,
@@ -379,10 +422,10 @@ class DashboardController extends Controller
                     'total_quotes' => $totalQuotes,
                     'quotes_today' => $quotesToday,
                     'quotes_this_month' => $quotesThisMonth,
-                    'monthly_revenue' => 28650.95,
-                    'monthly_growth' => '+14.2%',
-                    'pending_orders' => 23,
-                    'today_sales' => 1250.80,
+                    'monthly_revenue' => round($monthlyRevenue, 2),
+                    'monthly_growth' => $monthlyGrowthLabel . '%',
+                    'pending_orders' => $pendingOrders,
+                    'today_sales' => round($todaySales, 2),
                     'total_products' => $totalProducts
                 ],
                  'recent_quotes' => Quote::with(['customer', 'company'])
@@ -398,7 +441,7 @@ class DashboardController extends Controller
                             'company' => $quote->company->name ?? 'Compañía no disponible',
                             'total' => $quote->total,
                             'status' => $quote->status,
-                            'status_label' => $this->getStatusLabel($quote->status),
+                            'status_label' => $this->getStatusLabel($quote->status->value),
                             'date' => $quote->quote_date->format('Y-m-d H:i:s'),
                             'valid_until' => $quote->valid_until,
                             'days_remaining' => $quote->valid_until ? now()->diffInDays($quote->valid_until, false) : null,
@@ -449,7 +492,20 @@ class DashboardController extends Controller
                     $sellersCount = Seller::where('company_id', $company->id)->count();
                     $customersCount = Customer::where('company_id', $company->id)->count();
                     $quotesCount = Quote::where('company_id', $company->id)->count();
-                    
+
+                    // ✅ Calcular ventas mensuales REALES
+                    $monthlySales = Quote::where('company_id', $company->id)
+                                       ->whereMonth('quote_date', now()->month)
+                                       ->whereYear('quote_date', now()->year)
+                                       ->where('status', '!=', 'rejected')
+                                       ->sum('total');
+
+                    // ✅ Calcular ventas diarias REALES
+                    $dailySales = Quote::where('company_id', $company->id)
+                                     ->whereDate('quote_date', today())
+                                     ->where('status', '!=', 'rejected')
+                                     ->sum('total');
+
                     return [
                         'id' => $company->id,
                         'name' => $company->name,
@@ -457,91 +513,172 @@ class DashboardController extends Controller
                         'sellers_count' => $sellersCount,
                         'customers_count' => $customersCount,
                         'quotes_count' => $quotesCount,
-                        'monthly_sales' => rand(5000, 20000) + (rand(0, 99) / 100),
-                        'daily_sales' => rand(200, 800) + (rand(0, 99) / 100),
+                        'monthly_sales' => round($monthlySales, 2),
+                        'daily_sales' => round($dailySales, 2),
                         'commission_rate' => '4.5%'
                     ];
                 }),
-                'seller_performance' => [
-                    [
-                        'seller_name' => 'María González',
-                        'company' => 'Restaurant El Buen Sabor',
-                        'sales_today' => 420.80,
-                        'sales_month' => 4250.30,
-                        'quotes_created' => 8,
-                        'customers_served' => 15,
-                        'commission_earned' => 191.25,
-                        'performance_rating' => 'excellent',
-                        'status' => 'active'
-                    ],
-                    [
-                        'seller_name' => 'Juan Pérez',
-                        'company' => 'El Buen Sabor - Sucursal Norte',
-                        'sales_today' => 315.50,
-                        'sales_month' => 3180.75,
-                        'quotes_created' => 6,
-                        'customers_served' => 12,
-                        'commission_earned' => 120.87,
-                        'performance_rating' => 'good',
-                        'status' => 'active'
-                    ],
-                    [
-                        'seller_name' => 'Fernando Castro',
-                        'company' => 'Food Truck Delicias',
-                        'sales_today' => 180.20,
-                        'sales_month' => 2950.40,
-                        'quotes_created' => 4,
-                        'customers_served' => 8,
-                        'commission_earned' => 177.02,
-                        'performance_rating' => 'good',
-                        'status' => 'active'
-                    ]
-                ],
-                'daily_sales_chart' => [
-                    ['day' => 'Lunes', 'sales' => 950.30, 'quotes' => 3],
-                    ['day' => 'Martes', 'sales' => 1120.45, 'quotes' => 4],
-                    ['day' => 'Miércoles', 'sales' => 1350.80, 'quotes' => 6],
-                    ['day' => 'Jueves', 'sales' => 980.25, 'quotes' => 2],
-                    ['day' => 'Viernes', 'sales' => 1680.90, 'quotes' => 8],
-                    ['day' => 'Sábado', 'sales' => 2150.75, 'quotes' => 5],
-                    ['day' => 'Domingo', 'sales' => 1890.60, 'quotes' => 3]
-                ],
-                'popular_products' => [
-                    ['name' => 'Seco de Cabrito', 'sales_count' => 45, 'revenue' => 832.50, 'quotes_featured' => 12],
-                    ['name' => 'Pizza Margherita', 'sales_count' => 38, 'revenue' => 532.00, 'quotes_featured' => 8],
-                    ['name' => 'Lomo Saltado', 'sales_count' => 35, 'revenue' => 560.00, 'quotes_featured' => 10],
-                    ['name' => 'Ceviche Mixto', 'sales_count' => 28, 'revenue' => 420.00, 'quotes_featured' => 6],
-                    ['name' => 'Café Americano', 'sales_count' => 67, 'revenue' => 201.00, 'quotes_featured' => 15]
-                ],
-                'notifications' => [
-                    [
-                        'type' => 'success',
-                        'message' => 'Nueva cotización aprobada por $2,450.00 - Cliente: Empresa ABC',
-                        'timestamp' => now()->subMinutes(15)->format('Y-m-d H:i:s')
-                    ],
-                    [
-                        'type' => 'info',
-                        'message' => '3 cotizaciones creadas hoy por un total de $5,680.50',
-                        'timestamp' => now()->subMinutes(30)->format('Y-m-d H:i:s')
-                    ],
-                    [
-                        'type' => 'success',
-                        'message' => 'Venta record alcanzada en Restaurant El Buen Sabor',
-                        'timestamp' => now()->subMinutes(45)->format('Y-m-d H:i:s')
-                    ],
-                    [
-                        'type' => 'info',
-                        'message' => 'Nuevo cliente registrado: Carlos Mendoza',
-                        'timestamp' => now()->subHours(1)->format('Y-m-d H:i:s')
-                    ],
-                    [
-                        'type' => 'warning',
-                        'message' => 'Stock bajo en ingredientes para pizzas - Food Truck',
-                        'timestamp' => now()->subHours(2)->format('Y-m-d H:i:s')
-                    ]
-                ]
+                // ✅ Obtener vendedores reales de la compañía
+                'seller_performance' => Seller::where('company_id', $companyId)
+                    ->get()
+                    ->map(function($seller) use ($companyId) {
+                        // Calcular métricas reales del vendedor
+                        $quotes = Quote::where('company_id', $companyId)
+                            ->where('user_seller_id', $seller->user_id)
+                            ->get();
+
+                        $salesToday = Quote::where('company_id', $companyId)
+                            ->where('user_seller_id', $seller->user_id)
+                            ->whereDate('quote_date', today())
+                            ->where('status', '!=', 'rejected')
+                            ->sum('total');
+
+                        $salesMonth = Quote::where('company_id', $companyId)
+                            ->where('user_seller_id', $seller->user_id)
+                            ->whereMonth('quote_date', now()->month)
+                            ->whereYear('quote_date', now()->year)
+                            ->where('status', '!=', 'rejected')
+                            ->sum('total');
+
+                        $quotesCreated = $quotes->count();
+                        $commissionEarned = $salesMonth * 0.045; // 4.5% de comisión
+
+                        // Determinar rating basado en ventas mensuales
+                        $performanceRating = 'average';
+                        if ($salesMonth > 4000) $performanceRating = 'excellent';
+                        elseif ($salesMonth > 2000) $performanceRating = 'good';
+
+                        return [
+                            'seller_name' => $seller->name,
+                            'company' => $seller->company->name ?? 'N/A',
+                            'sales_today' => round($salesToday, 2),
+                            'sales_month' => round($salesMonth, 2),
+                            'quotes_created' => $quotesCreated,
+                            'customers_served' => $quotes->pluck('customer_id')->unique()->count(),
+                            'commission_earned' => round($commissionEarned, 2),
+                            'performance_rating' => $performanceRating,
+                            'status' => $seller->status
+                        ];
+                    }),
+                // ✅ Calcular datos reales del gráfico de ventas diarias
+                'daily_sales_chart' => collect(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'])
+                    ->map(function($day) use ($companyId) {
+                        // Mapear nombre de día a número de día de la semana (1=Lunes, 7=Domingo)
+                        $dayMap = ['Lunes' => 1, 'Martes' => 2, 'Miércoles' => 3, 'Jueves' => 4, 'Viernes' => 5, 'Sábado' => 6, 'Domingo' => 7];
+                        $dayNumber = $dayMap[$day];
+
+                        $quotes = Quote::where('company_id', $companyId)
+                            ->whereRaw('EXTRACT(DOW FROM quote_date) = ?', [$dayNumber])
+                            ->where('quote_date', '>=', now()->startOfWeek())
+                            ->where('status', '!=', 'rejected')
+                            ->get();
+
+                        return [
+                            'day' => $day,
+                            'sales' => round($quotes->sum('total'), 2),
+                            'quotes' => $quotes->count()
+                        ];
+                    })->toArray(),
+                // ✅ Obtener productos populares reales basados en los quotes
+                'popular_products' => \DB::table('quote_items')
+                    ->select('products.id', 'products.name', \DB::raw('COUNT(*) as sales_count'), \DB::raw('SUM(quote_items.total) as revenue'))
+                    ->join('products', 'quote_items.product_id', '=', 'products.id')
+                    ->join('quotes', 'quote_items.quote_id', '=', 'quotes.id')
+                    ->where('quotes.company_id', $companyId)
+                    ->where('quotes.status', '!=', 'rejected')
+                    ->where('quotes.quote_date', '>=', now()->subMonth())
+                    ->groupBy('products.id', 'products.name')
+                    ->orderBy('sales_count', 'desc')
+                    ->limit(5)
+                    ->get()
+                    ->map(function($product) {
+                        return [
+                            'id' => $product->id,
+                            'name' => $product->name,
+                            'sales_count' => $product->sales_count,
+                            'revenue' => round($product->revenue, 2)
+                        ];
+                    })->toArray(),
+                // ✅ Generar notificaciones reales basadas en actividad reciente
+                'notifications' => $this->generateRealNotifications($companyId)
             ]
         ]);
+    }
+
+    /**
+     * Generar notificaciones reales basadas en actividad reciente
+     */
+    private function generateRealNotifications($companyId)
+    {
+        $notifications = collect();
+
+        // Cotizaciones aprobadas recientemente
+        $approvedQuotes = Quote::where('company_id', $companyId)
+            ->where('status', 'approved')
+            ->where('updated_at', '>=', now()->subHours(24))
+            ->with('customer')
+            ->get()
+            ->take(3);
+
+        foreach ($approvedQuotes as $quote) {
+            $notifications->push([
+                'type' => 'success',
+                'message' => "Cotización #{$quote->id} aprobada por $" . number_format($quote->total, 2) . " - Cliente: " . ($quote->customer->name ?? 'N/A'),
+                'timestamp' => $quote->updated_at->format('Y-m-d H:i:s')
+            ]);
+        }
+
+        // Cotizaciones creadas hoy
+        $quotesTodayCount = Quote::where('company_id', $companyId)
+            ->whereDate('created_at', today())
+            ->count();
+
+        if ($quotesTodayCount > 0) {
+            $totalToday = Quote::where('company_id', $companyId)
+                ->whereDate('created_at', today())
+                ->sum('total');
+
+            $notifications->push([
+                'type' => 'info',
+                'message' => "{$quotesTodayCount} cotización" . ($quotesTodayCount > 1 ? 'es' : '') . " creada" . ($quotesTodayCount > 1 ? 's' : '') . " hoy por un total de $" . number_format($totalToday, 2),
+                'timestamp' => now()->format('Y-m-d H:i:s')
+            ]);
+        }
+
+        // Cotizaciones por vencer (próximas 3 días)
+        $expiringQuotes = Quote::where('company_id', $companyId)
+            ->whereIn('status', ['draft', 'sent'])
+            ->whereBetween('valid_until', [now(), now()->addDays(3)])
+            ->get();
+
+        foreach ($expiringQuotes as $quote) {
+            $daysLeft = now()->diffInDays($quote->valid_until, false);
+            $notifications->push([
+                'type' => 'warning',
+                'message' => "Cotización #{$quote->id} expira en {$daysLeft} día" . ($daysLeft > 1 ? 's' : '') . " - Cliente: " . ($quote->customer->name ?? 'N/A'),
+                'timestamp' => $quote->created_at->format('Y-m-d H:i:s')
+            ]);
+        }
+
+        // Nuevos clientes (últimos 7 días)
+        $newCustomers = Customer::where('company_id', $companyId)
+            ->where('created_at', '>=', now()->subDays(7))
+            ->get();
+
+        foreach ($newCustomers as $customer) {
+            $notifications->push([
+                'type' => 'info',
+                'message' => "Nuevo cliente registrado: {$customer->name}",
+                'timestamp' => $customer->created_at->format('Y-m-d H:i:s')
+            ]);
+        }
+
+        // Ordenar por timestamp y limitar a 10
+        return $notifications
+            ->sortByDesc('timestamp')
+            ->take(10)
+            ->values()
+            ->toArray();
     }
 
     /**
@@ -689,7 +826,7 @@ class DashboardController extends Controller
                             'company' => $quote->company->name ?? 'Compañía no disponible',
                             'total' => $quote->total,
                             'status' => $quote->status,
-                            'status_label' => $this->getStatusLabel($quote->status),
+                            'status_label' => $this->getStatusLabel($quote->status->value),
                             'date' => $quote->quote_date->format('Y-m-d H:i:s'),
                             'valid_until' => $quote->valid_until,
                             'days_remaining' => $quote->valid_until ? now()->diffInDays($quote->valid_until, false) : null,

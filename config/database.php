@@ -82,6 +82,21 @@ return [
             ]) : [],
         ],
 
+        'mysql_remote' => [
+            'driver' => 'mysql',
+            'host' => '91.238.160.176',
+            'port' => '3306',
+            'database' => 'chrystal_movil',
+            'username' => 'chrystal_app',
+            'password' => 'muentes123.',
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

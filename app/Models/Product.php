@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Enums\GenericStatus;
 
 class Product extends Model
 {
@@ -35,18 +36,20 @@ class Product extends Model
         'description_coin',
         'unitary_cost',
         'buy_tax',
-        'buy_aliquot'
+        'buy_aliquot',
+        'unidad',
+        'allow_decimal'
     ];
 
     protected $casts = [
         'price' => 'decimal:6',
         'cost' => 'decimal:6',
         'weight' => 'decimal:6',
-        'stock' => 'integer',
-        'min_stock' => 'integer',
+        'stock' => 'decimal:6',
+        'min_stock' => 'decimal:6',
         'images' => 'array',
         'attributes' => 'array',
-        'status' => 'string',
+        'status' => GenericStatus::class,
     ];
 
     /**
@@ -78,7 +81,7 @@ class Product extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->where('status', GenericStatus::ACTIVE->value);
     }
 
     /**

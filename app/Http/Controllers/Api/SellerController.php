@@ -24,16 +24,16 @@ class SellerController extends Controller
 
         // Filtrar según el rol del usuario autenticado
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 // Admin y Manager pueden ver todos los vendedores
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 // Company solo puede ver vendedores de sus compañías
                 $companyIds = $user->companies->pluck('id');    
                 $query->whereIn('company_id', $request->company_id ? [$request->company_id] : $companyIds);
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 // Seller solo puede ver sus propios registros
                 $query->where('user_id', $user->id);
                 break;
@@ -62,7 +62,7 @@ class SellerController extends Controller
         $user = $request->user();
 
         // Verificar permisos
-        if (!in_array($user->role, [User::ROLE_ADMIN, User::ROLE_MANAGER, User::ROLE_COMPANY])) {
+        if (!in_array($user->role, [\App\Enums\UserRole::ADMIN, \App\Enums\UserRole::MANAGER, \App\Enums\UserRole::COMPANY])) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para crear vendedores'
@@ -105,11 +105,11 @@ class SellerController extends Controller
         $canCreateInCompany = false;
 
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canCreateInCompany = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canCreateInCompany = $company->user_id === $user->id;
                 break;
         }
@@ -130,7 +130,7 @@ class SellerController extends Controller
                 'email' => $request->email,
                 'phone' => $request->phone,
                 'password' => Hash::make($request->password),
-                'role' => User::ROLE_SELLER,
+                'role' => \App\Enums\UserRole::SELLER,
                 'status' => User::STATUS_ACTIVE,
             ]);
 
@@ -189,14 +189,14 @@ class SellerController extends Controller
         // Verificar permisos
         $canView = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canView = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canView = $seller->company->user_id === $user->id;
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 $canView = $seller->company->user_id === $user->id;
                 break;
         }
@@ -232,11 +232,11 @@ class SellerController extends Controller
         // Verificar permisos
         $canUpdate = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canUpdate = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canUpdate = $seller->company->user_id === $user->id;
                 break;
         }
@@ -341,11 +341,11 @@ class SellerController extends Controller
         // Verificar permisos
         $canDelete = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canDelete = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canDelete = $seller->company->user_id === $user->id;
                 break;
         }
@@ -403,11 +403,11 @@ class SellerController extends Controller
         // Verificar permisos
         $canView = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canView = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canView = $company->user_id === $user->id;
                 break;
         }

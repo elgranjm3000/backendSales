@@ -28,9 +28,7 @@ return new class extends Migration
             $table->decimal('total', 15, 2)->default(0)->comment('Total final de la cotización');
             
             // Estado de la cotización
-            $table->enum('status', ['draft', 'sent', 'approved', 'rejected', 'expired'])
-                  ->default('draft')
-                  ->comment('Estado actual de la cotización');
+            $table->string('status')->default('draft')->comment('Estado actual de la cotización');
             
             // Campos de texto
             $table->text('notes')->nullable()->comment('Notas adicionales de la cotización');

@@ -7,6 +7,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\ActiveSession;
+use App\Enums\UserRole;
+use App\Enums\GenericStatus;
 
 class User extends Authenticatable
 {
@@ -45,6 +47,8 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'role' => UserRole::class,
+        'status' => GenericStatus::class,
     ];
 
     /**
@@ -72,6 +76,44 @@ class User extends Authenticatable
     public function sellers()
     {
         return $this->hasMany(Seller::class);
+    }
+
+    /**
+     * Relación con suscripciones del usuario
+     */
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * Obtener suscripción activa del usuario
+     */
+    public function activeSubscription($companyId = null)
+    {
+        /*return $this->subscriptions()
+            ->active()
+            ->when($companyId, function ($query, $companyId) {
+                return $query->where('company_id', $companyId);
+            })
+            ->latest()
+            ->first();*/
+            
+            return $this->subscriptions()
+            ->active()
+            ->when($companyId, function ($query, $companyId) {
+                return $query->where('company_id', $companyId);
+            })
+            ->latest()
+            ->get();
+    }
+
+    /**
+     * Verificar si el usuario tiene suscripción activa
+     */
+    public function hasActiveSubscription($companyId = null): bool
+    {
+        return $this->activeSubscription($companyId) !== null;
     }
 
     public function quotes()
@@ -135,7 +177,7 @@ class User extends Authenticatable
      */
     public function isActive()
     {
-        return $this->status === self::STATUS_ACTIVE;
+        return $this->status === \App\Enums\GenericStatus::ACTIVE;
     }
 
 

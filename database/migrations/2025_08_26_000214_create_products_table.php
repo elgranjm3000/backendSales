@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('image')->nullable();
             $table->json('images')->nullable();
             $table->foreignId('category_id')->constrained()->onDelete('cascade');
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->string('status')->default('active');
             $table->string('barcode')->nullable();
             $table->decimal('weight', 10, 3)->default(0);
             $table->json('attributes')->nullable();

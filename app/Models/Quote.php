@@ -4,6 +4,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Enums\QuoteStatus;
+use App\Services\QuoteCalculatorService;
 
 class Quote extends Model
 {
@@ -29,8 +31,9 @@ class Quote extends Model
         'sent_at' => 'datetime',
         'approved_at' => 'datetime',
         'metadata' => 'array',
-        'tax_amount' => 'decimal:6',      
-        'discount_amount' => 'decimal:6', 
+        'tax_amount' => 'decimal:6',
+        'discount_amount' => 'decimal:6',
+        'status' => QuoteStatus::class,
     ];
 
     // Estados del presupuesto
@@ -80,42 +83,42 @@ class Quote extends Model
     public function scopeValid($query)
     {
         return $query->where('valid_until', '>=', now()->toDateString())
-                    ->whereIn('status', [self::STATUS_SENT, self::STATUS_DRAFT]);
+                    ->whereIn('status', [QuoteStatus::SENT->value, QuoteStatus::DRAFT->value]);
     }
 
     public function scopeExpired($query)
     {
         return $query->where('valid_until', '<', now()->toDateString())
-                    ->whereNotIn('status', [self::STATUS_APPROVED, self::STATUS_REJECTED]);
+                    ->whereNotIn('status', [QuoteStatus::APPROVED->value, QuoteStatus::REJECTED->value]);
     }
 
     // Métodos de utilidad
     public function isExpired()
     {
-        return $this->valid_until && 
-               Carbon::parse($this->valid_until)->isPast() && 
-               !in_array($this->status, [self::STATUS_APPROVED, self::STATUS_REJECTED]);
+        return $this->valid_until &&
+               Carbon::parse($this->valid_until)->isPast() &&
+               !in_array($this->status->value, [QuoteStatus::APPROVED->value, QuoteStatus::REJECTED->value]);
     }
 
     public function canBeModified()
     {
-        return in_array($this->status, [self::STATUS_DRAFT]);
+        return $this->status === QuoteStatus::DRAFT;
     }
 
     public function canBeSent()
     {
-        return $this->status === self::STATUS_DRAFT && !$this->isExpired();
+        return $this->status === QuoteStatus::DRAFT && !$this->isExpired();
     }
 
     public function canBeApproved()
     {
-        return $this->status === self::STATUS_SENT && !$this->isExpired();
+        return $this->status === QuoteStatus::SENT && !$this->isExpired();
     }
 
     public function markAsSent()
     {
         $this->update([
-            'status' => self::STATUS_SENT,
+            'status' => QuoteStatus::SENT->value,
             'sent_at' => now()
         ]);
     }
@@ -123,20 +126,20 @@ class Quote extends Model
     public function approve()
     {
         $this->update([
-            'status' => self::STATUS_APPROVED,
+            'status' => QuoteStatus::APPROVED->value,
             'approved_at' => now()
         ]);
     }
 
     public function reject()
     {
-        $this->update(['status' => self::STATUS_REJECTED]);
+        $this->update(['status' => QuoteStatus::REJECTED->value]);
     }
 
     public function markAsExpired()
     {
         if ($this->isExpired()) {
-            $this->update(['status' => self::STATUS_EXPIRED]);
+            $this->update(['status' => QuoteStatus::EXPIRED->value]);
         }
     }
 
@@ -145,7 +148,25 @@ class Quote extends Model
         parent::boot();
 
         static::creating(function ($quote) {
-            $quote->quote_number = 'W' . str_pad(static::count() + 1, 10, '0', STR_PAD_LEFT);
+            //$quote->quote_number = 'W' . str_pad(static::count() + 1, 10, '0', STR_PAD_LEFT);
+            
+            // 1. Obtenemos el último número de esta compañía específica
+             $lastQuote = static::where('company_id', $quote->company_id)
+            ->latest('id') // O 'created_at'
+            ->first();
+
+        // 2. Extraemos el número correlativo
+        // Si no hay registros previos, empezamos en 1
+        $nextNumber = 1;
+
+        if ($lastQuote) {
+            // Suponiendo que el formato es 'W0000000001', quitamos la 'W' y sumamos 1
+            $lastNumericPart = (int) substr($lastQuote->quote_number, 1);
+            $nextNumber = $lastNumericPart + 1;
+        }
+
+        // 3. Asignamos el nuevo número con el prefijo y el relleno de ceros
+        $quote->quote_number = 'W' . str_pad($nextNumber, 9, '0', STR_PAD_LEFT);
             
             // Si no se especifica fecha de validez, por defecto 30 días
             if (!$quote->valid_until) {
@@ -156,6 +177,13 @@ class Quote extends Model
         // Marcar como expirados automáticamente
         static::retrieved(function ($quote) {
             $quote->markAsExpired();
+        });
+
+        // Update totals if tax or discount percentage changed
+        static::updating(function ($quote) {
+            if ($quote->isDirty(['tax', 'discount'])) {
+                app(QuoteCalculatorService::class)->updateQuoteTotals($quote->id);
+            }
         });
     }
 }

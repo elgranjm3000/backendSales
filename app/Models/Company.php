@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\GenericStatus;
 
 class Company extends Model
 {
@@ -35,6 +36,15 @@ class Company extends Model
     ];
 
     /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'status' => GenericStatus::class,
+    ];
+
+    /**
      * Constantes para estado
      */
     const STATUS_ACTIVE = 'active';
@@ -61,7 +71,7 @@ class Company extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('status', self::STATUS_ACTIVE);
+        return $query->where('status', GenericStatus::ACTIVE->value);
     }
 
     /**
@@ -69,7 +79,7 @@ class Company extends Model
      */
     public function isActive()
     {
-        return $this->status === self::STATUS_ACTIVE;
+        return $this->status === GenericStatus::ACTIVE;
     }
 
     /**
@@ -77,7 +87,7 @@ class Company extends Model
      */
     public function activeSellers()
     {
-        return $this->sellers()->where('seller_status', 'active');
+        return $this->sellers()->where('seller_status', GenericStatus::ACTIVE->value);
     }
 
     /**

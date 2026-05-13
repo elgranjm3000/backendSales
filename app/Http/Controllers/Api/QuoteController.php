@@ -17,16 +17,16 @@ class QuoteController extends Controller
         
         // Filtrar según el rol del usuario autenticado
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 // Admin y Manager pueden ver todas las cotizaciones
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 // Company solo puede ver cotizaciones de sus compañías
                 $companyIds = $user->companies->pluck('id');
                 $query->whereIn('company_id', $companyIds);
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 // Seller solo puede ver sus propias cotizaciones
                 //$companyIds = $user->companies->pluck('id');                
 
@@ -86,215 +86,192 @@ class QuoteController extends Controller
     }
 
    public function store(Request $request)
-    {
-        $user = auth()->user();
+  {
+     
+      
+      $user = auth()->user();
 
-        $request->validate([
-            'customer_id' => 'required|exists:customers,id',
-            'company_id' => 'required|exists:companies,id',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.buy_tax' => 'required|in:0,1', // ✨ buy_tax: 1=exento, 0=gravable
-            'valid_until' => 'nullable|date|after:today',
-            'terms_conditions' => 'nullable|string',
-            'notes' => 'nullable|string',
-            'discount' => 'nullable|numeric|min:0|max:100' // ✨ % de descuento
-        ]);
+      $request->validate([
+          'customer_id' => 'required|exists:customers,id',
+          'company_id' => 'required|exists:companies,id',
+          'items' => 'required|array|min:1',
+          'items.*.product_id' => 'required|exists:products,id',
+          'items.*.quantity' => 'required|numeric|min:0',
+          'items.*.unit_price' => 'required|numeric|min:0',
+          'items.*.buy_tax' => 'required|in:0,1',
+          'valid_until' => 'nullable|date|after:today',
+          'terms_conditions' => 'nullable|string',
+          'notes' => 'nullable|string',
+          'discount' => 'nullable|numeric|min:0|max:100'
+      ]);
 
-        // Verificar permisos sobre la compañía
-        $canCreate = false;
-        switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
-                $canCreate = true;
-                break;
-            case User::ROLE_COMPANY:
-                $canCreate = $user->companies->contains($request->company_id);
-                break;
-            case User::ROLE_SELLER:
-                // El seller debe pertenecer a la compañía
-                $canCreate = $user->sellers()->where('company_id', $request->company_id)->exists();
-                break;
-        }
+      // Verificar permisos sobre la compañía
+     $canCreate = false;
+      switch ($user->role) {
+          case \App\Enums\UserRole::ADMIN:
+          case \App\Enums\UserRole::MANAGER:
+              $canCreate = true;
+              break;
+          case \App\Enums\UserRole::COMPANY:
+              $canCreate = $user->companies->contains($request->company_id);
+              break;
+          case \App\Enums\UserRole::SELLER:
+              $canCreate = $user->sellers()->where('company_id', $request->company_id)->exists();
+              break;
+      }
 
-        if (!$canCreate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No tienes permisos para crear cotizaciones en esta compañía'
-            ], 403);
-        }
+      if (!$canCreate) {
+          return response()->json([
+              'success' => false,
+              'message' => 'No tienes permisos para crear cotizaciones en esta compañía'
+          ], 403);
+      }
 
-        DB::beginTransaction();
-        try {
-            // ✨ CÁLCULO CORRECTO CON buy_tax
-            $subtotal = 0;
-            $taxableBase = 0;      // ✨ Base sobre la que se cobra IVA (buy_tax = 0)
-            $exemptBase = 0;       // ✨ Base exenta de IVA (buy_tax = 1)
-            $totalesTaxAmount = 0;
+      DB::beginTransaction();
+      try {
 
-            // ✨ PASO 1: Calcular subtotal y separar gravable/exento
-            /*foreach ($request->items as $item) {
-                
-           
-                $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
-                $itemTaxAmout = round(($itemSubtotal * $item['aliquot']) / 100,2);
-                // Aplicar descuento individual si existe
-                $itemDiscount = round($itemSubtotal * (($item['discount_percentage'] ?? 0) / 100),2);
-                $itemTotal = round($itemSubtotal - $itemDiscount,2);
-                
-                $subtotal += $itemTotal;
-                
 
-                
-                // ✨ Separar por buy_tax
-                // buy_tax = 1 → IVA EXENTO (no paga impuesto)
-                // buy_tax = 0 → GRAVABLE (sí paga 16% IVA)
-                if ($item['buy_tax'] == 1) {
-                    $exemptBase += 0;
-                } else {
-                    $taxableBase += $itemTaxAmout;
-                }
-               
-                
-                $totalesTaxAmout = $taxableBase;
-            }*/
-            
-             foreach ($request->items as $item) {
-                  // ✅ MÉTODO DE IMPRESORA FISCAL: Calcular IVA por unidad primero
-            
-                  // Calcular subtotal del item
-                  $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
-            
-                  // Calcular IVA usando el método de impresora fiscal (por unidad)
-                  $itemTaxAmount = 0;
-                  if ($item['buy_tax'] != 1) {  // Si no es exento
-                      $aliquot = $item['aliquot'] ?? 16;
-            
-                      // PASO 1: Calcular IVA por unidad y redondear
-                      $taxPerUnit = round(($item['unit_price'] * $aliquot) / 100, 2);
-            
-                      // PASO 2: Multiplicar por cantidad y redondear
-                      $itemTaxAmount = round($taxPerUnit * $item['quantity'], 2);
-                  }
-            
-                  // Aplicar descuento individual si existe
-                  $itemDiscount = round($itemSubtotal * (($item['discount_percentage'] ?? 0) / 100), 2);
-            
-                  // Calcular total del item (subtotal - descuento + IVA)
-                  $itemTotal = round($itemSubtotal - $itemDiscount + $itemTaxAmount, 2);
-            
-                  // Alternativa: usar los valores calculados por el frontend
-                  // $itemTaxAmount = round($item['tax_amount'] ?? 0, 2);
-                  // $itemDiscount = round($item['discount_amount'] ?? 0, 2);
-                  // $itemTotal = round($item['total'] ?? ($itemSubtotal - $itemDiscount + $itemTaxAmount), 2);
-            
-                  $subtotal += $itemSubtotal;
-            
-                  // ✅ Separar por buy_tax
-                  // buy_tax = 1 → IVA EXENTO (no paga impuesto)
-                  // buy_tax = 0 → GRAVABLE (sí paga IVA)
-                  if ($item['buy_tax'] == 1) {
-                      $exemptBase += 0;
-                  } else {
-                      $taxableBase += $itemTaxAmount;
-                  }
-                  
-                  $totalesTaxAmount = $taxableBase;
+          // ✨ CÁLCULO CORRECTO - MÉTODO DE IMPRESORA FISCAL
+          $subtotal = 0;
+          $taxableBase = 0;
+          $exemptBase = 0;
+          $totalTaxAmount = 0;
+
+          foreach ($request->items as $item) {
+              // Obtener datos del producto si no se proporcionan
+              $product = \App\Models\Product::find($item['product_id']);
+
+              // PASO 1: Calcular subtotal del item
+              $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
+
+              // PASO 2: Calcular descuento sobre el subtotal
+              $discountPercentage = $item['discount_percentage'] ?? 0;
+              $itemDiscount = round($itemSubtotal * ($discountPercentage / 100), 2);
+
+              // PASO 3: Calcular subtotal DESPUÉS del descuento
+              $itemSubtotalAfterDiscount = round($itemSubtotal - $itemDiscount, 2);
+
+              // PASO 4: Calcular IVA sobre el subtotal CON DESCUENTO
+              $itemTaxAmount = 0;
+              if ($item['buy_tax'] != 1) {  // Si no es exento
+                  $aliquot = $item['aliquot'] ?? ($product->aliquot ?? 0);
+                  $itemTaxAmount = round($itemSubtotalAfterDiscount * ($aliquot / 100), 2);
               }
 
+              // PASO 5: Calcular total del item
+              $itemTotal = round($itemSubtotalAfterDiscount + $itemTaxAmount, 2);
 
-            // ✨ PASO 2: Aplicar descuento general (% sobre todo)
-            $discountPercentage = $request->discount ?? 0;
-            $discountAmount = ($subtotal * $discountPercentage) / 100;
-            
-            // ✨ PASO 3: Calcular base gravable DESPUÉS del descuento
-            $finalTaxableBase = max(0, $taxableBase - $discountAmount);
-            
-            // ✨ PASO 4: Calcular IVA (16%) SOLO sobre lo gravable
-            $taxAmount = $finalTaxableBase * 0.16;
-            
-            // ✨ PASO 5: Calcular total final
-            $total = ($subtotal - $discountAmount)+$totalesTaxAmount;
+              $subtotal += $itemSubtotal;
 
-            // ✨ DATOS PARA GUARDAR
-            $quoteData = [
-                'customer_id' => $request->customer_id,
-                'company_id' => $request->company_id,
-                'tax' => 16,  // IVA rate (16%)
-                'tax_amount' => $totalesTaxAmount,  // ✨ Monto real de impuesto
-                'discount' => $discountPercentage,  // ✨ % de descuento
-                'discount_amount' => $discountAmount,  // ✨ Monto real de descuento
-                'subtotal' => $subtotal,  // ✨ Guardamos también el subtotal
-                'total' => $total,  // ✨ Total final
-                'status' => $request->status ?? 'pending',
-                'quote_date' => now(),
-                'valid_until' => $request->valid_until,
-                'terms_conditions' => $request->terms_conditions,
-                'notes' => $request->notes,
-                'metadata' => $request->metadata ?? [],                
-                'bcv_rate' => $request->bcv_rate ?? null,
-                'bcv_date' => $request->bcv_date ?? null,
-                
-            ];
+              if ($item['buy_tax'] == 1) {
+                  $exemptBase += $itemSubtotalAfterDiscount;
+              } else {
+                  $taxableBase += $itemSubtotalAfterDiscount;
+              }
 
-            if ($user->role == User::ROLE_SELLER) {
-                $quoteData['user_seller_id'] = $user->id;
-            }
+              $totalTaxAmount += $itemTaxAmount;
+          }
 
-            $quote = Quote::create($quoteData);
+          // PASO 6: Aplicar descuento general (% sobre subtotal)
+          $discountPercentage = $request->discount ?? 0;
+          $discountAmount = round($subtotal * $discountPercentage / 100, 2);
 
-            // ✨ PASO 6: Crear items del presupuesto con buy_tax
-             foreach ($request->items as $item) {
-                $itemSubtotal = $item['quantity'] * $item['unit_price'];
-                $itemTaxAmout = ($itemSubtotal * $item['aliquot']) / 100;
-                $itemDiscount = $itemSubtotal * (($item['discount_percentage'] ?? 0) / 100);
-                $itemTotal = ($itemSubtotal - $itemDiscount)+$itemTaxAmout;
-               
+          // PASO 7: Calcular total final
+          $total = round($subtotal - $discountAmount + $totalTaxAmount, 2);
 
-                $quote->items()->create([
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total' => round($itemTotal, 2),  // ✨ Total DESPUÉS del descuento individual
-                    'discount_percentage' => $item['discount_percentage'] ?? 0,
-                    'name' => $item['name'] ?? null,
-                    'buy_tax' => $item['buy_tax'],  // ✨ 1aliquot
-                    'tax_percentage'=>$item['aliquot'],
-                    'tax_amount' => $itemTaxAmout,
-                    'type_price' => $item['type_price'] ?? null,
-                ]);
-            }
+          // ✨ DATOS PARA GUARDAR
+          $quoteData = [
+              'customer_id' => $request->customer_id,
+              'company_id' => $request->company_id,
+              'tax' => 16,
+              'tax_amount' => $totalTaxAmount,
+              'discount' => $discountPercentage,
+              'discount_amount' => $discountAmount,
+              'subtotal' => $subtotal,
+              'total' => $total,
+              'status' => $request->status ?? 'draft',
+              'quote_date' => now(),
+              'valid_until' => $request->valid_until,
+              'terms_conditions' => $request->terms_conditions,
+              'notes' => $request->notes,
+              'metadata' => $request->metadata ?? [],
+              'bcv_rate' => $request->bcv_rate ?? null,
+              'bcv_date' => $request->bcv_date ?? null,
+          ];
 
-            DB::commit();
+          if ($user->role == \App\Enums\UserRole::SELLER) {
+              $quoteData['user_seller_id'] = $user->id;
+          }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Cotización creada exitosamente',
-                'data' => $quote->load(['customer', 'company', 'items.product']),
-                // ✨ Información de cálculo para debugging
-                'calculation_info' => [
-                    'subtotal' => round($subtotal, 2),
-                    'taxable_base' => round($taxableBase, 2),
-                    'exempt_base' => round($exemptBase, 2),
-                    'discount_percentage' => $discountPercentage,
-                    'discount_amount' => round($discountAmount, 2),
-                    'final_taxable_base' => round($finalTaxableBase, 2),
-                    'tax_amount' => round($taxAmount, 2),
-                    'total' => round($total, 2),
-                ]
-            ], 201);
+          $quote = Quote::create($quoteData);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Error creating quote: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al crear la cotización: ' . $e->getMessage()
-            ], 500);
-        }
-    }
+          // ✨ PASO 8: Crear items con los mismos cálculos
+          foreach ($request->items as $index => $item) {
+              // Obtener datos del producto si no se proporcionan
+              $product = \App\Models\Product::find($item['product_id']);
+
+              // CÁLCULOS IDENTICOS AL PRIMER LOOP
+              $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
+              $discountPercentage = $item['discount_percentage'] ?? 0;
+              $itemDiscount = round($itemSubtotal * ($discountPercentage / 100), 2);
+              $itemSubtotalAfterDiscount = round($itemSubtotal - $itemDiscount, 2);
+
+              $itemTaxAmount = 0;
+              $aliquot = $item['aliquot'] ?? ($product->aliquot ?? 0);
+              if ($item['buy_tax'] != 1) {
+                  // ✅ CORREGIDO: Calcular IVA sobre el subtotal CON DESCUENTO
+                  $itemTaxAmount = round($itemSubtotalAfterDiscount * ($aliquot / 100), 2);
+              }
+
+              $itemTotal = round($itemSubtotalAfterDiscount + $itemTaxAmount, 2);
+
+              $quote->items()->create([
+                  'product_id' => $item['product_id'],
+                  'quantity' => $item['quantity'],
+                  'unit_price' => $item['unit_price'],
+                  'total' => $itemTotal,
+                  'discount_percentage' => $discountPercentage,
+                  'discount_amount' => $itemDiscount,
+                  'name' => $item['name'] ?? ($product->name ?? 'Producto'),
+                  'description' => $item['description'] ?? ($product->description ?? null),
+                  'buy_tax' => $item['buy_tax'],
+                  'tax_percentage' => $aliquot,
+                  'tax_amount' => $itemTaxAmount,
+                  'type_price' => $item['type_price'] ?? 'default',
+                  'item_type' => 'product',
+                  'unit' => $product->unidad ?? 'pcs',
+                  'sort_order' => $index + 1,
+                  'subtotal' => $itemSubtotal,
+              ]);
+          }
+
+          DB::commit();
+
+          return response()->json([
+              'success' => true,
+              'message' => 'Cotización creada exitosamente',
+              'data' => $quote->load(['customer', 'company', 'items.product']),
+              'calculation_info' => [
+                  'subtotal' => $subtotal,
+                  'taxable_base' => $taxableBase,
+                  'exempt_base' => $exemptBase,
+                  'discount_percentage' => $discountPercentage,
+                  'discount_amount' => $discountAmount,
+                  'tax_amount' => $totalTaxAmount,
+                  'total' => $total,
+              ]
+          ], 201);
+
+      } catch (\Exception $e) {
+          DB::rollBack();
+          \Log::error('Error creating quote: ' . $e->getMessage());
+          return response()->json([
+              'success' => false,
+              'message' => 'Error al crear la cotización: ' . $e->getMessage()
+          ], 500);
+      }
+  }
+
 
     public function show($id)
     {
@@ -306,14 +283,14 @@ class QuoteController extends Controller
         // Verificar permisos
         $canView = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canView = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canView = $user->companies->contains($quote->company_id);
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                  //$canView = $user->sellers->contains($quote->company_id);
                  //dd($canView);
                  $canView = true;
@@ -333,22 +310,43 @@ class QuoteController extends Controller
         ]);
     }
 
-    public function update(Request $request, Quote $quote)
+    public function update(Request $request, $id)
     {
         $user = auth()->user();
+        $quote = Quote::find($id);
+
+        if (!$quote) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cotización no encontrada'
+            ], 404);
+        }
+
+        // Debug logging
+        \Log::info('Quote update attempt', [
+            'quote_id' => $quote->id,
+            'quote_company_id' => $quote->company_id,
+            'user_id' => $user->id,
+            'user_role' => $user->role->value
+        ]);
 
         // Verificar permisos
         $canUpdate = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canUpdate = true;
                 break;
-            case User::ROLE_COMPANY:
-                $canUpdate = $user->companies->contains($quote->company_id);
+            case \App\Enums\UserRole::COMPANY:
+                $canUpdate = \App\Models\Company::where('id', $quote->company_id)
+                    ->where('user_id', $user->id)
+                    ->exists();
+                \Log::info('COMPANY permission check', ['can_update' => $canUpdate]);
                 break;
-            case User::ROLE_SELLER:
-               $canUpdate = $user->companies->contains($quote->company_id);
+            case \App\Enums\UserRole::SELLER:
+                $canUpdate = \App\Models\Company::where('id', $quote->company_id)
+                    ->where('user_id', $user->id)
+                    ->exists();
                 break;
         }
 
@@ -367,70 +365,125 @@ class QuoteController extends Controller
             ], 400);
         }
 
+        // Validación más flexible - items son opcionales para actualizaciones parciales
         $request->validate([
-            'customer_id' => 'required|exists:customers,id',
-            'company_id' => 'required|exists:companies,id',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'customer_id' => 'sometimes|exists:customers,id',
+            'company_id' => 'sometimes|exists:companies,id',
+            'items' => 'sometimes|array|min:1',
+            'items.*.product_id' => 'required_with:items|exists:products,id',
+            'items.*.quantity' => 'required_with:items|integer|min:1',
+            'items.*.unit_price' => 'required_with:items|numeric|min:0',
             'valid_until' => 'nullable|date|after:today',
             'terms_conditions' => 'nullable|string',
             'notes' => 'nullable|string',
-            'discount' => 'nullable|numeric|min:0'
+            'discount' => 'nullable|numeric|min:0',
+            'status' => 'sometimes|string|in:draft,sent,approved,rejected,expired'
         ]);
 
         DB::beginTransaction();
         try {
-            // Eliminar items existentes
-            $quote->items()->delete();
+            // Si se envían items, eliminar los existentes y crear los nuevos
+            if ($request->has('items') && is_array($request->items)) {
+                // Eliminar items existentes
+                $quote->items()->delete();
 
-            $subtotal = 0;
-            
-            // Recalcular con nuevos items
-            foreach ($request->items as $item) {
-                $itemTotal = $item['quantity'] * $item['unit_price'];
-                if (isset($item['discount'])) {
-                    $itemTotal -= $item['discount'];
+                $subtotal = 0;
+
+                // Recalcular con nuevos items
+                foreach ($request->items as $item) {
+                    $itemTotal = $item['quantity'] * $item['unit_price'];
+                    if (isset($item['discount'])) {
+                        $itemTotal -= $item['discount'];
+                    }
+                    $subtotal += $itemTotal;
                 }
-                $subtotal += $itemTotal;
-            }
 
-            $discount = $request->discount ?? 0;
-            $tax = ($subtotal - $discount) * 0.18;
-            $total = $subtotal + $tax - $discount;
+                $discount = $request->discount ?? 0;
+                $tax = ($subtotal - $discount) * 0.18;
+                $total = $subtotal + $tax - $discount;
 
-            $quote->update([
-                'customer_id' => $request->customer_id,
-                'company_id' => $request->company_id,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'discount' => $discount,
-                'total' => $total,
-                'valid_until' => $request->valid_until,
-                'terms_conditions' => $request->terms_conditions,
-                'notes' => $request->notes
-            ]);
+                $quote->update([
+                    'customer_id' => $request->customer_id ?? $quote->customer_id,
+                    'company_id' => $request->company_id ?? $quote->company_id,
+                    'subtotal' => $subtotal,
+                    'tax' => $tax,
+                    'discount' => $discount,
+                    'total' => $total,
+                    'valid_until' => $request->valid_until ?? $quote->valid_until,
+                    'terms_conditions' => $request->terms_conditions,
+                    'notes' => $request->notes
+                ]);
 
-            // Crear nuevos items
-            foreach ($request->items as $item) {
-                $quote->items()->create([
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total_price' => $item['quantity'] * $item['unit_price'],
-                    'discount' => $item['discount'] ?? 0
+                // Crear nuevos items
+                foreach ($request->items as $item) {
+                    $quote->items()->create([
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'total_price' => $item['quantity'] * $item['unit_price'],
+                        'discount' => $item['discount'] ?? 0
+                    ]);
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Cotización actualizada exitosamente',
+                    'data' => $quote->load(['customer', 'company', 'items.product'])
+                ]);
+            } else {
+                // Actualización parcial sin items - solo actualizar campos proporcionados
+                $updateData = [];
+
+                if ($request->has('customer_id')) {
+                    $updateData['customer_id'] = $request->customer_id;
+                }
+                if ($request->has('company_id')) {
+                    $updateData['company_id'] = $request->company_id;
+                }
+                if ($request->has('valid_until')) {
+                    $updateData['valid_until'] = $request->valid_until;
+                }
+                if ($request->has('terms_conditions')) {
+                    $updateData['terms_conditions'] = $request->terms_conditions;
+                }
+                if ($request->has('notes')) {
+                    $updateData['notes'] = $request->notes;
+                }
+                if ($request->has('discount')) {
+                    $updateData['discount'] = $request->discount;
+                }
+                if ($request->has('status')) {
+                    $updateData['status'] = $request->status;
+                }
+
+                // Actualizar subtotal, tax, total si se proporcionan
+                if ($request->has('subtotal')) {
+                    $updateData['subtotal'] = $request->subtotal;
+                }
+                if ($request->has('tax')) {
+                    $updateData['tax'] = $request->tax;
+                }
+                if ($request->has('tax_amount')) {
+                    $updateData['tax_amount'] = $request->tax_amount;
+                }
+                if ($request->has('total')) {
+                    $updateData['total'] = $request->total;
+                }
+
+                if (!empty($updateData)) {
+                    $quote->update($updateData);
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Cotización actualizada exitosamente',
+                    'data' => $quote->load(['customer', 'company', 'items.product'])
                 ]);
             }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Cotización actualizada exitosamente',
-                'data' => $quote->load(['customer', 'company', 'items.product'])
-            ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
@@ -440,24 +493,36 @@ class QuoteController extends Controller
         }
     }
 
-    public function destroy(Request $request, Quote $quote)
+    public function destroy(Request $request, $id)
     {
         $user = auth()->user();
+        $quote = Quote::find($id);
+
+        if (!$quote) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cotización no encontrada'
+            ], 404);
+        }
 
         // Verificar permisos
         $canDelete = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
+            case \App\Enums\UserRole::ADMIN:
                 $canDelete = true;
                 break;
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::MANAGER:
                 $canDelete = true;
                 break;
-            case User::ROLE_COMPANY:
-                $canDelete = $user->companies->contains($quote->company_id);
+            case \App\Enums\UserRole::COMPANY:
+                $canDelete = \App\Models\Company::where('id', $quote->company_id)
+                    ->where('user_id', $user->id)
+                    ->exists();
                 break;
-            case User::ROLE_SELLER:
-                $canDelete = $user->companies->contains($quote->company_id);
+            case \App\Enums\UserRole::SELLER:
+                $canDelete = \App\Models\Company::where('id', $quote->company_id)
+                    ->where('user_id', $user->id)
+                    ->exists();
                 break;
         }
 
@@ -492,14 +557,14 @@ class QuoteController extends Controller
         // Verificar permisos
         $canSend = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canSend = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canSend = $user->companies->contains($quote->company_id);
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 $canSend = $user->companies->contains($quote->company_id);
                 break;
         }
@@ -532,14 +597,14 @@ class QuoteController extends Controller
         $user = auth()->user();
 
         // Solo admin, manager y company pueden aprobar
-        if (!in_array($user->role, [User::ROLE_ADMIN, User::ROLE_MANAGER, User::ROLE_COMPANY])) {
+        if (!in_array($user->role, [\App\Enums\UserRole::ADMIN, \App\Enums\UserRole::MANAGER, \App\Enums\UserRole::COMPANY])) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para aprobar cotizaciones'
             ], 403);
         }
 
-        if ($user->role === User::ROLE_COMPANY && !$user->companies->contains($quote->company_id)) {
+        if ($user->role === \App\Enums\UserRole::COMPANY && !$user->companies->contains($quote->company_id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para aprobar esta cotización'
@@ -567,14 +632,14 @@ class QuoteController extends Controller
         $user = auth()->user();
 
         // Solo admin, manager y company pueden rechazar
-        if (!in_array($user->role, [User::ROLE_ADMIN, User::ROLE_MANAGER, User::ROLE_COMPANY])) {
+        if (!in_array($user->role, [\App\Enums\UserRole::ADMIN, \App\Enums\UserRole::MANAGER, \App\Enums\UserRole::COMPANY])) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para rechazar cotizaciones'
             ], 403);
         }
 
-        if ($user->role === User::ROLE_COMPANY && !$user->companies->contains($quote->company_id)) {
+        if ($user->role === \App\Enums\UserRole::COMPANY && !$user->companies->contains($quote->company_id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'No tienes permisos para rechazar esta cotización'
@@ -604,14 +669,14 @@ class QuoteController extends Controller
         // Verificar permisos
         $canDuplicate = false;
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 $canDuplicate = true;
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $canDuplicate = $user->companies->contains($quote->company_id);
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 $canDuplicate = $user->companies->contains($quote->company_id);
                 break;
         }
@@ -677,14 +742,14 @@ class QuoteController extends Controller
 
         // Filtrar según rol
         switch ($user->role) {
-            case User::ROLE_ADMIN:
-            case User::ROLE_MANAGER:
+            case \App\Enums\UserRole::ADMIN:
+            case \App\Enums\UserRole::MANAGER:
                 break;
-            case User::ROLE_COMPANY:
+            case \App\Enums\UserRole::COMPANY:
                 $companyIds = $user->companies->pluck('id');
                 $query->whereIn('company_id', $companyIds);
                 break;
-            case User::ROLE_SELLER:
+            case \App\Enums\UserRole::SELLER:
                 $companyIds = $user->companies->pluck('id');
                 $query->whereIn('company_id', $companyIds);
                 break;
