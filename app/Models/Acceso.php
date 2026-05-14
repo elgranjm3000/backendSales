@@ -181,4 +181,29 @@ class Acceso extends Model
                 ->orWhere('codigo', 'ilike', "%{$search}%");
         });
     }
+
+    /**
+     * Relación con la company (por email)
+     */
+    
+
+    public function company()
+  {
+      return $this->belongsTo(\App\Models\Company::class, 'correo_electronico', 'email');
+  }
+
+
+    /**
+     * Obtener vendedores a través de la company
+     */
+    public function sellers()
+    {
+        return $this->hasManyThrough(
+            \App\Models\Seller::class,
+            \App\Models\Company::class,
+            'correo_electronico',
+            'email',
+            'company_id'
+        );
+    }
 }

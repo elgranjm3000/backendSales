@@ -28,6 +28,15 @@
                     </svg>
                     Empresas
                 </a>
+                @if(auth()->check() && auth()->user()->role->value === 'manager')
+                <a href="{{ route('admin.docs') }}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ request()->routeIs('admin.docs') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Docs
+                </a>
+                @endif
             </nav>
             <div class="p-4 border-t border-gray-100 shrink-0">
                 <div class="flex items-center gap-3 px-3 py-2 text-sm text-gray-500">
@@ -36,7 +45,7 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-700 truncate">{{ Auth::user()->name }}</p>
-                        <p class="text-xs text-gray-400">Cajero</p>
+                        <p class="text-xs text-gray-400">{{ Auth::user()->role->value === 'admin' ? 'Admin' : 'Manager' }}</p>
                     </div>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
@@ -68,9 +77,12 @@
                          class="fixed right-4 top-3 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-2">
                         <div class="px-4 py-2 border-b border-gray-100">
                             <p class="text-sm font-medium">{{ Auth::user()->name }}</p>
-                            <p class="text-xs text-gray-400">Cajero</p>
+                            <p class="text-xs text-gray-400">{{ Auth::user()->role->value === 'admin' ? 'Admin' : 'Manager' }}</p>
                         </div>
                         <a href="{{ route('admin.accesos') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Empresas</a>
+                        @if(auth()->check() && auth()->user()->role->value === 'manager')
+                        <a href="{{ route('admin.docs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Docs</a>
+                        @endif
                         <form method="POST" action="{{ route('logout') }}" class="border-t border-gray-100 pt-1">
                             @csrf
                             <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Cerrar sesión</button>

@@ -29,6 +29,7 @@ class Seller extends Model
         'percent_gerencial_credit_note',
         'percent_returned_check',
         'seller_status',
+        'mobilecheck',
     ];
 
     /**
@@ -44,6 +45,7 @@ class Seller extends Model
         'percent_returned_check' => 'double',
         'inkeeper' => 'boolean',
         'seller_status' => GenericStatus::class,
+        'mobilecheck' => 'boolean',
     ];
 
     /**

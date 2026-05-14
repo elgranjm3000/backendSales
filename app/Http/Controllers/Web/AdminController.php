@@ -14,9 +14,14 @@ class AdminController extends Controller
     /**
      * Página de documentación de los endpoints de sincronización.
      */
+
+
+    /**
+     * Página de documentación de los endpoints de sincronización.
+     */
     public function docs()
     {
-        return view('sync-docs');
+        return view('admin.docs');
     }
 
     /**
@@ -24,7 +29,7 @@ class AdminController extends Controller
      */
     public function loginForm()
     {
-        if (Auth::check() && Auth::user()->role->value === 'admin') {
+        if (Auth::check() && in_array(Auth::user()->role->value, ['admin', 'manager'])) {
             return redirect()->route('admin.accesos');
         }
         return view('admin.login');
@@ -77,14 +82,14 @@ class AdminController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $user = Auth::user();
 
-            // Solo permitir acceso a usuarios con rol cajero
-            if ($user->role->value !== 'admin') {
+            // Solo permitir acceso a usuarios con rol admin o manager
+            if (!in_array($user->role->value, ['admin', 'manager'])) {
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
 
                 return back()->withErrors([
-                    'email' => 'No tienes permisos de admin para acceder.',
+                    'email' => 'No tienes permisos para acceder.',
                 ])->onlyInput('email');
             }
 
@@ -152,9 +157,51 @@ class AdminController extends Controller
         }
 
         // Paginación
-        $accesos = $query->paginate(20)->withQueryString();
+        $accesos = $query->with('company.sellers')->paginate(20)->withQueryString();
 
         return view('admin.accesos', compact('accesos'));
+
+    }
+
+    /**
+     * Mostrar formulario de edición de un acceso.
+     */
+    public function edit($id, Request $request)
+    {
+        $accesoEdit = Acceso::with('company.sellers')->findOrFail($id);
+
+        $query = Acceso::orderBy('nombre');
+
+        // Mantener los filtros actuales
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'ilike', "%{$search}%")
+                  ->orWhere('codigo', 'ilike', "%{$search}%")
+                  ->orWhere('correo_electronico', 'ilike', "%{$search}%")
+                  ->orWhere('id_fiscal', 'ilike', "%{$search}%");
+            });
+        }
+
+        if ($request->has('filter')) {
+            switch ($request->filter) {
+                case 'blocked':
+                    $query->whereNotNull('blocked_at');
+                    break;
+                case 'active':
+                    $query->whereNull('blocked_at');
+                    break;
+                case 'no_key':
+                    $query->whereNull('api_key');
+                    break;
+            }
+        }
+
+        $accesos = $query->with('company.sellers')->paginate(20)->withQueryString();
+        $editMode = true;
+
+
+        return view('admin.accesos', compact('accesos', 'accesoEdit', 'editMode'));
     }
 
     /**
@@ -234,6 +281,20 @@ class AdminController extends Controller
     }
 
     /**
+     * Habilitar/deshabilitar acceso móvil de un vendedor.
+     */
+    public function toggleMobilecheck($sellerId)
+    {
+        $seller = \App\Models\Seller::findOrFail($sellerId);
+        $seller->update(['mobilecheck' => !$seller->mobilecheck]);
+
+        return response()->json([
+            'success' => true,
+            'mobilecheck' => $seller->mobilecheck
+        ]);
+    }
+
+    /**
      * Crear una nueva empresa con API key.
      */
     public function store(Request $request)
@@ -257,6 +318,58 @@ class AdminController extends Controller
         $acceso = Acceso::create($validated);
 
         return redirect()->route('admin.accesos')->with('success', "Empresa {$acceso->nombre} creada exitosamente. API Key: {$acceso->api_key}");
+    }
+
+    /**
+     * Actualizar un acceso existente.
+     */
+    public function update(Request $request, $id)
+    {
+        $acceso = Acceso::findOrFail($id);
+
+        // Guardar email antiguo antes de actualizar
+        $oldEmail = $acceso->correo_electronico;
+
+        try {
+            $validated = $request->validate([
+                'nombre' => 'required|string|max:255',
+                'id_fiscal' => 'required|string|max:50|unique:acceso,codigo,' . $id,
+                'direccion' => 'nullable|string',
+                'telefono' => 'nullable|string|max:50',
+                'ciudad' => 'nullable|string|max:100',
+                'estado' => 'nullable|string|max:100',
+                'correo_electronico' => 'nullable|email|max:255|unique:acceso,correo_electronico,' . $id,
+            ], [
+                'correo_electronico.unique' => 'Este correo electrónico ya está registrado en otra empresa.',
+                'id_fiscal.unique' => 'Este RIF ya está registrado en otra empresa.',
+            ]);
+
+            // El código será igual al ID Fiscal (RIF)
+            $validated['codigo'] = $validated['id_fiscal'];
+
+            // Mantener la API key existente (no regenerar)
+            unset($validated['api_key']);
+
+            $acceso->update($validated);
+
+            // Si el email cambió, actualizar en companies
+            if (isset($validated['correo_electronico']) && $validated['correo_electronico'] !== $oldEmail) {
+                $company = \App\Models\Company::where('email', $oldEmail)->first();
+                if ($company) {
+                    $company->update([
+                        'email' => $validated['correo_electronico'],
+                        'name' => $validated['nombre']
+                    ]);
+                }
+            }
+
+            return redirect()->route('admin.accesos')->with('success', "Empresa {$acceso->nombre} actualizada exitosamente.");
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Redirigir a la ruta de edición con los errores
+            return redirect()->route('admin.accesos.edit', $id)
+                ->withErrors($e->errors())
+                ->withInput();
+        }
     }
 
     /**

@@ -3,7 +3,25 @@
 @section('title', 'Empresas - Chrystal Mobile')
 
 @section('content')
-<div x-data="{ modalOpen: false }" class="p-4 md:p-6">
+<div x-data="{
+    modalOpen: {{ isset($accesoEdit) || $errors->any() ? 'true' : 'false' }},
+    isEdit: {{ isset($accesoEdit) ? 'true' : 'false' }},
+    openCreate() {
+        this.isEdit = false;
+        this.$nextTick(() => {
+            const fields = ['form-nombre', 'form-id_fiscal', 'form-email', 'form-telefono', 'form-ciudad', 'form-estado', 'form-direccion'];
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                el.value = '';
+                el.classList.remove('border-red-500');
+                el.classList.add('border-gray-300');
+            });
+            // Ocultar mensajes de error
+            document.querySelectorAll('.text-red-600').forEach(el => el.remove());
+        });
+    },
+    openEdit() { this.isEdit = true; }
+}" class="p-4 md:p-6">
     {{-- Header --}}
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
@@ -12,7 +30,7 @@
         </div>
         <div class="flex items-center gap-2">
             <span class="text-xs text-gray-400">{{ $accesos->total() }} registros</span>
-            <button @click="modalOpen = true" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
+            <button @click="modalOpen = true; openCreate()" class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -133,6 +151,7 @@
                         <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">Empresa</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">RIF</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">Email</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">Vendedores</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">API Key</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">Estado</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase tracking-wider">Desactivado</th>
@@ -151,21 +170,68 @@
                             <td class="px-4 py-3 text-gray-600">{{ $acceso->codigo }}</td>
                             <td class="px-4 py-3 text-gray-600 text-xs">{{ $acceso->correo_electronico ?? '-' }}</td>
                             <td class="px-4 py-3">
-                                @if($acceso->api_key)
-                                    <div x-data="{ show: false, copied: false }" class="flex items-center gap-1">
-                                        <code x-text="show ? '{{ $acceso->api_key }}' : '{{ substr($acceso->api_key, 0, 12) }}...'" class="text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded"></code>
-                                        <button @click="show = !show" class="p-1 text-gray-400 hover:text-gray-600" :title="show ? 'Ocultar' : 'Mostrar'">
-                                            <svg x-show="!show" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                            <svg x-show="show" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                @if($acceso->company && $acceso->company->sellers->count() > 0)
+                                    <div x-data="{ open: false }" class="relative">
+                                        <button @click="open = !open" class="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700">
+                                            @if($acceso->company->sellers->count() <= 5)
+                                                @foreach($acceso->company->sellers->take(5) as $seller)
+                                                    <span class="inline-block">{{ $seller->code ?? substr($seller->name, 0, 10) }}</span>
+                                                @endforeach
+                                            @else
+                                                <span class="inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10a2 2 0 002 2v3a2 2 0 002-2H7a2 2 0 00-2 2v-2a2 2 0 012-2h.01M12 7a2 2 0 012 2v0a2 2 0 00-2 2v-3a2 2 0 002 2h.01"/></svg>
+                                                    <span>{{ $acceso->company->sellers->count() }}</span>
+                                                </span>
+                                            @endif
                                         </button>
-                                        <button @click="navigator.clipboard.writeText('{{ $acceso->api_key }}'); copied = true; setTimeout(() => copied = false, 2000)" class="p-1 text-gray-400 hover:text-gray-600" title="Copiar">
-                                            <svg x-show="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                            <span x-show="copied" class="text-green-600 text-xs" x-cloak>Copiado</span>
-                                        </button>
+                                        <div x-show="open" @click.outside="open = false" x-cloak class="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-xl py-2 px-3 min-w-[280px]">
+                                            <div class="text-xs font-medium text-gray-500 mb-2">
+                                                {{ $acceso->company->sellers->count() }} Vendedor{{ $acceso->company->sellers->count() == 1 ? '' : 'es' }}
+                                            </div>
+                                            <div class="space-y-1 max-h-48 overflow-y-auto">
+                                                @foreach($acceso->company->sellers as $seller)
+                                                    <div x-data="{ mobilecheck: {{ !!$seller->mobilecheck }} }" class="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 rounded-lg">
+                                                        <div class="flex items-center gap-2">
+                                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                                <input type="checkbox"
+                                                                       class="sr-only peer"
+                                                                       x-model="mobilecheck"
+                                                                       @change="window.toggleMobilecheck('{{ $seller->id }}')">
+                                                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 peer-checked:border-indigo-600"></div>
+                                                            </label>
+                                                            <span class="text-xs text-gray-700">{{ $seller->code }}</span>
+                                                        </div>
+                                                        <span class="text-xs" x-text="mobilecheck === 1 ? 'Habilitado' : 'Deshabilitado'" :class="mobilecheck === 1 ? 'text-green-600' : 'text-gray-400'"></span>
+                                                    </div>
+
+                                                @endforeach
+                                            </div>
+                                            </div>
+                           
+                                      
                                     </div>
                                 @else
-                                    <span class="text-xs text-gray-400">Sin API key</span>
+                                    <span class="text-xs text-gray-400">Sin Vendedores</span>
                                 @endif
+                            </td>
+                            <td>
+                                <span class="text-xs text-gray-400">
+                                        @if($acceso->api_key)
+                        <div x-data="{ show: false, copied: false, copyKey(key) { if (navigator.clipboard) { navigator.clipboard.writeText(key).then(() => this.copied = true).catch(() => { const el = document.createElement('textarea'); el.value = key; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); this.copied = true; }); } else { const el = document.createElement('textarea'); el.value = key; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); this.copied = true; } setTimeout(() => this.copied = false, 2000); } }" class="flex items-center gap-1 mt-0.5">
+                            <code x-text="show ? '{{ $acceso->api_key }}' : '{{ substr($acceso->api_key, 0, 12) }}...'" class="text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded break-all"></code>
+                            <button @click="show = !show" class="p-1 text-gray-400 hover:text-gray-600 shrink-0">
+                                <svg x-show="!show" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                <svg x-show="show" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-cloak><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                            </button>
+                            <button @click="copyKey('{{ $acceso->api_key }}')" class="p-1 text-gray-400 hover:text-gray-600 shrink-0">
+                                <svg x-show="!copied" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                <span x-show="copied" class="text-green-600 text-xs" x-cloak>Copiado</span>
+                            </button>
+                        </div>
+                    @else
+                        <span class="text-xs text-gray-400">Sin API key</span>
+                    @endif
+                                </span>
                             </td>
                             <td class="px-4 py-3">
                                 @if($acceso->isBlocked())
@@ -184,6 +250,12 @@
                                 {{ $acceso->blocked_at ? $acceso->blocked_at->format('d/m/Y H:i') : '-' }}
                             </td>
                             <td class="px-4 py-3 text-center">
+                                <a href="{{ route('admin.accesos.edit', $acceso->id) }}" @click="openEdit({{ $acceso->id }})" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-gray-700 hover:bg-gray-100 transition-colors mr-2">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414 2 2 0 112.828 0 4-4L4 16l-4-4m0 0L4 12l4-4m0 0l4 4" />
+                                    </svg>
+                                    Editar
+                                </a>
                                 <form method="POST" action="{{ route('admin.accesos.toggle-block', $acceso->id) }}" class="inline"
                                       onsubmit="return confirm('{{ $acceso->isBlocked() ? '¿Activar' : '¿Desactivar' }} a {{ $acceso->nombre }}?')">
                                     @csrf
@@ -230,7 +302,7 @@
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.stop>
                 {{-- Header --}}
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-900">Nueva Empresa</h2>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ isset($accesoEdit) || request()->isMethod('PUT') ? 'Editar Empresa' : 'Nueva Empresa' }}</h2>
                     <button @click="modalOpen = false" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -239,65 +311,91 @@
                 </div>
 
                 {{-- Formulario --}}
-                <form method="POST" action="{{ route('admin.accesos.store') }}" class="p-6 space-y-4">
+                <form method="POST" action="{{ isset($accesoEdit) ? route('admin.accesos.update', $accesoEdit->id) : route('admin.accesos.store') }}" class="p-6 space-y-4">
                     @csrf
+                    @if(isset($accesoEdit))
+                        <input type="hidden" name="_method" value="PUT">
+                    @elseif(old('_method') === 'PUT')
+                        <input type="hidden" name="_method" value="PUT">
+                    @endif
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {{-- Nombre --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                            <input type="text" name="nombre" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            <input type="text" id="form-nombre" name="nombre" value="{{ old('nombre', isset($accesoEdit) ? $accesoEdit->nombre : '') }}" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none {{ $errors->has('nombre') ? 'border-red-500' : '' }}"
                                    placeholder="Ej: Mi Empresa S.A.">
+                            @error('nombre')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         {{-- RIF/ID Fiscal --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">RIF / ID Fiscal *</label>
-                            <input type="text" name="id_fiscal" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            <input type="text" id="form-id_fiscal" name="id_fiscal" value="{{ old('id_fiscal', isset($accesoEdit) ? $accesoEdit->id_fiscal : '') }}" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none {{ $errors->has('id_fiscal') ? 'border-red-500' : '' }}"
                                    placeholder="Ej: J-12345678-9">
+                            @error('id_fiscal')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         {{-- Email --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                            <input type="email" name="correo_electronico"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            <input type="email" id="form-email" name="correo_electronico" value="{{ old('correo_electronico', isset($accesoEdit) ? $accesoEdit->correo_electronico : '') }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none {{ $errors->has('correo_electronico') ? 'border-red-500' : '' }}"
                                    placeholder="correo@empresa.com">
+                            @error('correo_electronico')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         {{-- Teléfono --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                            <input type="text" name="telefono"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            <input type="text" id="form-telefono" name="telefono" value="{{ old('telefono', isset($accesoEdit) ? $accesoEdit->telefono : '') }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none {{ $errors->has('telefono') ? 'border-red-500' : '' }}"
                                    placeholder="Ej: 0251-1234567">
+                            @error('telefono')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         {{-- Ciudad --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
-                            <input type="text" name="ciudad"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            <input type="text" id="form-ciudad" name="ciudad" value="{{ old('ciudad', isset($accesoEdit) ? $accesoEdit->ciudad : '') }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none {{ $errors->has('ciudad') ? 'border-red-500' : '' }}"
                                    placeholder="Ej: Valencia">
+                            @error('ciudad')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         {{-- Estado --}}
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                            <input type="text" name="estado"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            <input type="text" id="form-estado" name="estado" value="{{ old('estado', isset($accesoEdit) ? $accesoEdit->estado : '') }}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none {{ $errors->has('estado') ? 'border-red-500' : '' }}"
                                    placeholder="Ej: Carabobo">
+                            @error('estado')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
 
                     {{-- Dirección --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
-                        <textarea name="direccion" rows="2"
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
-                                  placeholder="Dirección física de la empresa"></textarea>
+                        <textarea id="form-direccion" name="direccion" rows="2"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none {{ $errors->has('direccion') ? 'border-red-500' : '' }}"
+                                  placeholder="Dirección física de la empresa">{{ old('direccion', isset($accesoEdit) ? $accesoEdit->direccion : '') }}</textarea>
+                        @error('direccion')
+                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     {{-- Info --}}
@@ -306,7 +404,7 @@
                             <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <p class="text-sm text-blue-800">El código se generará automáticamente desde el RIF. Se creará una API Key única para esta empresa.</p>
+                            <p class="text-sm text-blue-800">{{ isset($accesoEdit) || old('_method') === 'PUT' ? 'El código se actualizará automáticamente desde el RIF. La API Key existente se mantendrá.' : 'El código se generará automáticamente desde el RIF. Se creará una API Key única para esta empresa.' }}</p>
                         </div>
                     </div>
 
@@ -316,7 +414,7 @@
                             Cancelar
                         </button>
                         <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors">
-                            Crear Empresa
+                            {{ isset($accesoEdit) || old('_method') === 'PUT' ? 'Actualizar Empresa' : 'Crear Empresa' }}
                         </button>
                     </div>
                 </form>
@@ -324,4 +422,33 @@
         </div>
     </div>
 </div>
+</div>
+
+<script>
+window.toggleMobilecheck = function(sellerId) {
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = metaTag ? metaTag.getAttribute('content') : document.querySelector('input[name="_token"]')?.value;
+    
+    if (!csrfToken) {
+        console.error('Token CSRF no encontrado');
+        return;
+    }
+    
+    const route = '/mobiletest/public/admin/sellers/' + sellerId + '/toggle-mobilecheck';
+    fetch(route, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken
+        },
+        body: JSON.stringify({ _method: 'POST' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        }
+    });
+};
+</script>
 @endsection

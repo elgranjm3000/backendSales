@@ -81,10 +81,19 @@ Route::get('/', [AdminController::class, 'loginForm'])->name('home');
 Route::get('/login', [AdminController::class, 'loginForm'])->name('login');
 Route::post('/login', [AdminController::class, 'login']);
 
-// Panel de administración (solo cajeros)
-Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+// Panel de administración (admin y manager pueden ver accesos)
+Route::middleware(['auth', 'admin.or.manager'])->prefix('admin')->group(function () {
     Route::get('/accesos', [AdminController::class, 'index'])->name('admin.accesos');
+    Route::get('/accesos/create', [AdminController::class, 'create'])->name('admin.accesos.create');
     Route::post('/accesos', [AdminController::class, 'store'])->name('admin.accesos.store');
+    Route::get('/accesos/{id}/edit', [AdminController::class, 'edit'])->name('admin.accesos.edit');
+    Route::put('/accesos/{id}', [AdminController::class, 'update'])->name('admin.accesos.update');
     Route::post('/accesos/{id}/toggle-block', [AdminController::class, 'toggleBlock'])->name('admin.accesos.toggle-block');
+    Route::post('/sellers/{id}/toggle-mobilecheck', [AdminController::class, 'toggleMobilecheck'])->name('admin.sellers.toggle-mobilecheck');
     Route::post('/logout', [AdminController::class, 'logout'])->name('logout');
+});
+
+// Panel de gestión para managers (documentación de API)
+Route::middleware(['auth', 'manager'])->prefix('admin')->group(function () {
+    Route::get('/docs', [AdminController::class, 'docs'])->name('admin.docs');
 });

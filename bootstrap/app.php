@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.acceso' => \App\Http\Middleware\AuthenticateAccesoToken::class,
             'throttle.acceso' => \App\Http\Middleware\ThrottleAccesoSync::class,
             'admin' => \App\Http\Middleware\CheckCajeroRole::class,
+            'manager' => \App\Http\Middleware\CheckManagerRole::class,
+            'admin.or.manager' => \App\Http\Middleware\CheckAdminOrManagerRole::class,
         ]);
 
         // IMPORTANTE: Excluir rutas API del CSRF

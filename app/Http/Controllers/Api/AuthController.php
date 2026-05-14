@@ -102,6 +102,15 @@ class AuthController extends Controller
             $user->load('companies');
         } elseif ($user->role === \App\Enums\UserRole::SELLER) {
             $user->load('sellers.company');
+
+            // Verificar mobilecheck para sellers
+            $seller = $user->sellers->first();
+            if (!$seller || !$seller->mobilecheck) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Acceso móvil deshabilitado. Contacte al administrador.'
+                ], 403);
+            }
         }
 
         if (!$user->isActive()) {
