@@ -11,6 +11,10 @@ use App\Enums\GenericStatus;
 class Product extends Model
 {
     use HasFactory;
+    
+    protected $hidden = [
+        'product_image',
+    ];
 
     protected $fillable = [
         'company_id',
@@ -38,7 +42,9 @@ class Product extends Model
         'buy_tax',
         'buy_aliquot',
         'unidad',
-        'allow_decimal'
+        'allow_decimal',
+        'image_type',
+        'product_image'
     ];
 
     protected $casts = [

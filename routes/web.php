@@ -81,10 +81,26 @@ Route::get('/', [AdminController::class, 'loginForm'])->name('home');
 Route::get('/login', [AdminController::class, 'loginForm'])->name('login');
 Route::post('/login', [AdminController::class, 'login']);
 
-// Panel de administración (solo cajeros)
-Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+// Panel de administración (admin y manager pueden ver accesos)
+Route::middleware(['auth', 'admin.or.manager'])->prefix('admin')->group(function () {
     Route::get('/accesos', [AdminController::class, 'index'])->name('admin.accesos');
     Route::post('/accesos', [AdminController::class, 'store'])->name('admin.accesos.store');
+    Route::match(['post', 'put'], '/accesos/{id}', [AdminController::class, 'update'])->name('admin.accesos.update');
+    Route::post('/accesos/{id}/edit-data', [AdminController::class, 'editData'])->name('admin.accesos.edit-data');
     Route::post('/accesos/{id}/toggle-block', [AdminController::class, 'toggleBlock'])->name('admin.accesos.toggle-block');
+    Route::post('/sellers/{id}/toggle-mobilecheck', [AdminController::class, 'toggleMobilecheck'])->name('admin.sellers.toggle-mobilecheck');
+    Route::put('/companies/{id}/offline-hours', [AdminController::class, 'updateOfflineHours'])->name('admin.companies.offline-hours');
     Route::post('/logout', [AdminController::class, 'logout'])->name('logout');
+});
+
+// Panel de gestión para managers (documentación de API)
+Route::middleware(['auth', 'manager'])->prefix('admin')->group(function () {
+      Route::get('/usuarios', [AdminController::class, 'usuarios'])->name('admin.usuarios');
+      Route::get('/usuarios/crear', [AdminController::class, 'createUsuario'])->name('admin.usuarios.create');
+      Route::post('/usuarios', [AdminController::class, 'storeUsuario'])->name('admin.usuarios.store');
+      Route::get('/usuarios/{id}/editar', [AdminController::class, 'editUsuario'])->name('admin.usuarios.edit');
+      Route::post('/usuarios/{id}/edit-data', [AdminController::class, 'editDataUsuario'])->name('admin.usuarios.edit-data');
+      Route::put('/usuarios/{id}', [AdminController::class, 'updateUsuario'])->name('admin.usuarios.update');
+      Route::delete('/usuarios/{id}', [AdminController::class, 'destroyUsuario'])->name('admin.usuarios.destroy');
+      Route::get('/docs', [AdminController::class, 'docs'])->name('admin.docs');
 });

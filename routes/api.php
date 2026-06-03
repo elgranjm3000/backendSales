@@ -81,6 +81,7 @@ use App\Http\Controllers\Api\SyncController;
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
+    Route::get('token-status', [AuthController::class, 'tokenStatus'])->middleware('auth:sanctum');
 });
 
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
@@ -251,8 +252,7 @@ Route::middleware(['auth:sanctum'])->prefix('sync-data')->group(function () {
         ->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_customers');
 
     // Sincronizar quotes (requiere feature sync_quotes - NO disponible en trial)
-    Route::post('/quotes', [SyncDataController::class, 'syncQuotes'])
-        ->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_quotes');
+    Route::post('/quotes', [SyncDataController::class, 'syncQuotes']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_quotes');
 
     // Sincronizar sellers (requiere feature sync_sellers)
     Route::post('/sellers', [SyncDataController::class, 'syncSellers'])
@@ -281,7 +281,7 @@ Route::middleware(['auth:sanctum'])->prefix('sync-batch')->group(function () {
     // Products (requiere feature sync_products)
     Route::get('/products', [SyncController::class, 'getProducts'])
         ->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
-    Route::post('/products', [SyncController::class, 'syncProductsBatch']); //  ->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
+    //Route::post('/products', [SyncController::class, 'syncProductsBatch']); //  ->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
     Route::delete('/products', [SyncController::class, 'destroyProductsBatch']); //      ->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
 
     // Customers (requiere feature sync_customers)

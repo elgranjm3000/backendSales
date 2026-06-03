@@ -42,13 +42,30 @@ class QuoteController extends Controller
                     'message' => 'No tienes permisos para listar cotizaciones'
                 ], 403);
         }
+        
+       if ($request->has('name')) {
+            $searchName = $request->name;
+            $query->where(function ($q) use ($searchName) {
+                $q->whereHas('company', function ($q2) use ($searchName) {
+                    $q2->where('name', 'ilike', "%{$searchName}%")
+                       ->orWhere('rif', 'ilike', "%{$searchName}%");
+                });
+            });
+        }
+        
+        if ($request->has('document')) {
+                $query->where('quote_number', 'ilike', "%{$request->document}%");
+        }
+
 
         // Filtros adicionales
         if ($request->has('status')) {
             $query->where('status', $request->status);
-        }      
-
+        }  
         
+         if ($request->has('user_seller_id')) {
+            $query->where('user_seller_id', $request->user_seller_id);
+        }      
 
         if ($request->has('customer_id')) {
             $query->where('customer_id', $request->customer_id);
@@ -267,7 +284,13 @@ class QuoteController extends Controller
           \Log::error('Error creating quote: ' . $e->getMessage());
           return response()->json([
               'success' => false,
-              'message' => 'Error al crear la cotización: ' . $e->getMessage()
+              'message' => 'Error al crear la cotización: ' . $e->getMessage(),
+              'debug' => [
+                    'exception' => get_class($e),   // Qué tipo de error es (ej: InvalidArgumentException)
+                    'file'      => $e->getFile(),    // En qué archivo ocurrió
+                    'line'      => $e->getLine(),    // En qué línea exacta ocurrió
+                    'trace'     => array_slice($e->getTrace(), 0, 5) // Los primeros 5 pasos del viaje del error
+                ]
           ], 500);
       }
   }

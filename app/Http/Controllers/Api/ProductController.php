@@ -7,6 +7,8 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
+
 
 class ProductController extends Controller
 {
@@ -25,17 +27,53 @@ class ProductController extends Controller
               ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
               ->when($request->status, fn($q) => $q->where('status', $request->status))
               ->when($request->low_stock, fn($q) => $q->lowStock())
-              ->when($request->search, fn($q) => $q->search($request->search));
+              ->when($request->search, fn($q) => $q->search($request->search))
+              ->when($request->description, function($q) use ($request) {
+                        $q->whereRaw('LOWER(description) LIKE ?', [Str::lower($request->description) . '%']);
+              })
+              ->when($request->code, function($q) use ($request) {
+                        $q->whereRaw('LOWER(code) LIKE ?', [Str::lower($request->code) . '%']);
+              });
 
           //$paginated = $query->orderBy('name')->paginate($perPage);
           $paginated = $query->reorder()
                    ->orderByRaw('LOWER(name) ASC')
                    ->paginate($perPage);
+        
+            // Convertir a colección y agregar image_url
+         $products = collect($paginated->items())->map(function ($product) {
+                    // 1. Extraemos los bytes del recurso de PostgreSQL si es que viene como un resource de PHP
+                    $binaryData = $product->product_image;
+                    if (is_resource($binaryData)) {
+                        $binaryData = stream_get_contents($binaryData);
+                    }
+                
+                    // 2. Ocultamos temporalmente el campo binario original para que $product->toArray() no se rompa
+                    $product->makeHidden(['product_image']);
+                    $productArray = $product->toArray();
+                
+                    // 3. Agregar tu URL en Base64 utilizando los bytes ya limpios
+                     $mimeType = $product->image_type;
+                      if (!str_contains($mimeType, '/')) {
+                          // Es solo el tipo (jpg, png), agregar prefix
+                          $mimeType = 'image/' . $mimeType;
+                      }
+                    
+                      if ($mimeType && $binaryData) {
+                          $productArray['image_url'] = "data:{$mimeType};base64," . base64_encode($binaryData);
+                      } else {
+                          $productArray['image_url'] = null;
+                      }
+
+                
+                    return $productArray;
+        });
+
 
           // ✅ Devolver en formato compatible con el frontend existente
           return response()->json([
               'success' => true,
-              'data' => $paginated->items(), // Solo el array de productos
+              'data' => $products, // Solo el array de productos
               'pagination' => [
                   'current_page' => $paginated->currentPage(),
                   'per_page' => $paginated->perPage(),

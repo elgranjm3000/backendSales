@@ -7,6 +7,7 @@ use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
@@ -18,6 +19,11 @@ class CustomerController extends Controller
         $query = Customer::with('company')
             ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
+            ->when($request->name, function($q) use ($request) {
+                        $q->whereRaw('LOWER(name) LIKE ?', ['%' .Str::lower($request->name) . '%']);
+              })
+             ->when($request->name, fn($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' .Str::lower($request->name) . '%']))
+            ->when($request->document_number, fn($q) => $q->where('document_number', 'like', $request->document_number  . '%'))
             ->when($request->search, function ($q) use ($request) {
                 $q->where(function ($query) use ($request) {
                     $query->where('name', 'LIKE', "%{$request->search}%")

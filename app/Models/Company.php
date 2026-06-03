@@ -32,7 +32,8 @@ class Company extends Model
         'main_image',
         'main_image_type',
         'status',
-        'rif'
+        'rif',
+        'offline_token_hours'
     ];
 
     /**

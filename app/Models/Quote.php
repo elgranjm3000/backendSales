@@ -142,6 +142,12 @@ class Quote extends Model
             $this->update(['status' => QuoteStatus::EXPIRED->value]);
         }
     }
+    
+       public function sellerData()                                                                                                                 
+ {                                                                                                                                            
+         return $this->hasOne(Seller::class, 'user_id', 'user_seller_id');                                                                        
+     }  
+
 
     protected static function boot()
     {

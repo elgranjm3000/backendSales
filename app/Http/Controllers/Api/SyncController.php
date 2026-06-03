@@ -142,7 +142,6 @@
               'products' => 'required|array',
               'products.*.code' => 'required|string|max:50',
               'products.*.name' => 'required|string|max:255',
-              'products.*.category_code' => 'nullable|string|max:50', // Acepta código de categoría
           ]);
 
           $startedAt = now();
@@ -163,6 +162,10 @@
 
           DB::transaction(function () use ($products, $companyId, &$stats, &$errors) {
               foreach ($products as $index => $productData) {
+                  $imageData = $productData['product_image'] ?? null;
+                  $imageType = $productData['image_type'] ?? null;
+                  unset($productData['product_image'], $productData['image_type']);
+
                   try {
                       // Si viene category_code, buscar category_id
                       if (isset($productData['category_id'])) {
@@ -175,15 +178,6 @@
                           } else {
                               // Opción 1: Dejar category_id como null
                               $productData['category_id'] = null;
-
-                              // Opción 2: Crear la categoría automáticamente
-                              // $category = Category::create([
-                              //     'company_id' => $companyId,
-                              //     'code' => $productData['category_code'],
-                              //     'name' => $productData['category_code'],
-                              //     'status' => 'active'
-                              // ]);
-                              // $productData['category_id'] = $category->id;
                           }
 
                           // Eliminar category_code antes de guardar
@@ -200,9 +194,29 @@
                           $stats['updated']++;
                       } else {
                           $productData['company_id'] = $companyId;
-                          Product::create($productData);
+                          $product = Product::create($productData);
                           $stats['created']++;
                       }
+                      
+                        
+                         if ($imageData && $imageType && $product) {
+                              try {
+                                  // No decodificar en PHP, dejar que PostgreSQL lo haga
+                                  DB::statement("
+                                      UPDATE products
+                                      SET image_type = ?,
+                                          product_image = decode(?, 'base64')
+                                      WHERE id = ?
+                                  ", [$imageType, $imageData, $product->id]);
+                              } catch (\Exception $imgError) {
+                                  \Log::error("Error imagen: " . $imgError->getMessage());
+                              }
+                          }
+
+                        DB::commit();
+
+      
+                      
                   } catch (\Exception $e) {
                       $stats['errors']++;
                       $errors[] = [
@@ -426,9 +440,101 @@
               'sellers.*.email' => 'required|email|max:255',
           ]);
 
-          $startedAt = now();
-          $companyId = $request->company_id;
           $sellers = $request->sellers;
+          $companyId = $request->company_id;
+
+          // Validar emails duplicados dentro del mismo batch
+          $emails = array_column($sellers, 'email');
+          $duplicateEmails = array_filter(array_count_values($emails), fn($count) => $count > 1);
+
+          if (!empty($duplicateEmails)) {
+              return response()->json([
+                  'success' => false,
+                  'message' => 'Emails duplicados en el lote',
+                  'duplicate_emails' => array_keys($duplicateEmails),
+                  'error' => 'Los siguientes emails se repiten dentro del lote: ' . implode(', ', array_keys($duplicateEmails))
+              ], 422);
+          }
+
+          // Validar emails que ya existen en otra compañía
+          $existingUsers = User::whereIn('email', $emails)
+              ->with('sellers')
+              ->get();
+
+          $existingEmailsInfo = [];
+          $existingEmails = [];
+
+          foreach ($existingUsers as $user) {
+              // Obtener la compañía del usuario según su rol
+              $userCompanyId = null;
+              $roleDescription = '';
+
+              switch ($user->role->value) {
+                  case 'company':
+                      $userCompanyId = $user->companies()->first()?->id;
+                      $roleDescription = 'compañía';
+                      break;
+                  case 'seller':
+                      $userCompanyId = $user->sellers()->first()?->company_id;
+                      $roleDescription = 'vendedor';
+                      break;
+                  case 'cajero':
+                      $roleDescription = 'sincronizador';
+                      // Cajero no tiene compañía asociada directamente
+                      break;
+                  case 'admin':
+                      $roleDescription = 'administrador';
+                      break;
+                  case 'manager':
+                      $roleDescription = 'super administrador';
+                      break;
+                  default:
+                      $roleDescription = $user->role->value;
+              }
+
+              // Solo es error si está en otra compañía
+              if ($userCompanyId && $userCompanyId != $companyId) {
+                  $existingEmails[] = $user->email;
+                  $existingEmailsInfo[] = [
+                      'email' => $user->email,
+                      'role' => $user->role->value,
+                      'role_description' => $roleDescription,
+                      'company_id' => $userCompanyId,
+                  ];
+              } elseif ($userCompanyId === null && in_array($user->role->value, ['admin', 'manager', 'cajero'])) {
+                  // Admin, Manager y Cajero no pueden tener sellers
+                  $existingEmails[] = $user->email;
+                  $existingEmailsInfo[] = [
+                      'email' => $user->email,
+                      'role' => $user->role->value,
+                      'role_description' => $roleDescription,
+                      'company_id' => null,
+                  ];
+              }
+          }
+
+          if (!empty($existingEmails)) {
+              // Construir mensaje detallado
+              $errorMessages = [];
+              foreach ($existingEmailsInfo as $info) {
+                  $msg = "{$info['email']} (rol: {$info['role_description']}";
+                  if ($info['company_id']) {
+                      $msg .= ", compañía ID: {$info['company_id']}";
+                  }
+                  $msg .= ")";
+                  $errorMessages[] = $msg;
+              }
+
+              return response()->json([
+                  'success' => false,
+                  'message' => 'Emails ya existen en el sistema',
+                  'existing_emails' => $existingEmails,
+                  'existing_emails_info' => $existingEmailsInfo,
+                  'error' => 'Los siguientes emails ya están en uso: ' . implode(', ', $errorMessages)
+              ], 422);
+          }
+
+          $startedAt = now();
           $stats = ['created' => 0, 'updated' => 0, 'errors' => 0];
           $errors = [];
 
@@ -456,6 +562,12 @@
                               'role' => 'seller',
                               'status' => 'active',
                           ]);
+                      }else{
+                          $user->update([
+                              'name' => $sellerData['description'],
+                              'password' => $sellerData['password'],
+                          ]);
+
                       }
 
                       // Buscar seller por (user_id, company_id) - clave única real
@@ -522,6 +634,36 @@
       public function destroySellersBatch(Request $request)
       {
           return $this->_destroyBatch($request, new Seller(), 'code', 'codes');
+          
+                  /*$request->validate([
+                      'company_id' => 'required|integer',
+                      'codes' => 'required|array'
+                  ]);
+            
+                  // Obtener los user_id de los vendedores a eliminar
+                  $userIds = Seller::where('company_id', $request->company_id)
+                      ->whereIn('code', $request->codes)
+                      ->pluck('user_id')
+                      ->filter()
+                      ->unique()
+                      ->toArray();
+            
+                  if (empty($userIds)) {
+                      return response()->json([
+                          'success' => true,
+                          'deleted' => 0
+                      ]);
+                  }
+            
+                  // Borrar usuarios → cascada borra los sellers automáticamente
+                  $deleted = User::whereIn('id', $userIds)->delete();
+            
+                  return response()->json([
+                      'success' => true,
+                      'deleted' => $deleted
+                  ]);*/
+          
+          
       }
 
       // =========================================================================
@@ -712,9 +854,23 @@
               'status' => 'required|string|in:pending,approved,rejected,canceled,completed',
           ]);
 
-          $quote = Quote::where('id', $id)
-              ->where('company_id', $request->company_id)
-              ->first();
+          $quote = null;
+      
+          // Si es numérico, buscar por id (columna integer)
+          if (is_numeric($id)) {
+              $quote = Quote::where('id', $id)
+                  ->where('company_id', $request->company_id)
+                  ->first();
+          }
+    
+          // Si no se encontró, buscar por quote_number (columna string)
+          if (!$quote) {
+              $quote = Quote::where('quote_number', $id)
+                  ->where('company_id', $request->company_id)
+                  ->first();
+          }
+
+
 
           if (!$quote) {
               return response()->json([
@@ -747,7 +903,7 @@
               'from_date' => 'nullable|date',
           ]);
 
-          $query = Quote::with(['items.product', 'customer', 'seller'])
+          $query = Quote::with(['items.product', 'customer', 'seller','sellerData'])
               ->where('company_id', $request->company_id);
 
           if ($request->has('status')) {
@@ -759,6 +915,15 @@
           }
 
           $quotes = $query->orderBy('created_at', 'desc')->get();
+          
+          $quotes = $quotes->map(function ($quote) {
+      if ($quote->sellerData && $quote->sellerData->company_id == $quote->company_id) {
+          $quote->seller->code = $quote->sellerData->code;
+      }
+      unset($quote->sellerData, $quote->sellerData);
+      return $quote;
+  });
+
 
           return response()->json([
               'success' => true,

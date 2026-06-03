@@ -102,6 +102,15 @@ class AuthController extends Controller
             $user->load('companies');
         } elseif ($user->role === \App\Enums\UserRole::SELLER) {
             $user->load('sellers.company');
+
+            // Verificar mobilecheck para sellers
+            $seller = $user->sellers->first();
+            if (!$seller || !$seller->mobilecheck) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Acceso móvil deshabilitado. Contacte al administrador.'
+                ], 403);
+            }
         }
 
         if (!$user->isActive()) {
@@ -114,6 +123,17 @@ class AuthController extends Controller
         // Verificar sesión activa
     $activeSession = $user->getActiveSession();
     $isDemoUser = ($user->email === 'demo@test.com');
+
+    // Obtener horas offline permitidas por la empresa
+    $offlineTokenHours = 24; // default
+    if ($user->role === \App\Enums\UserRole::COMPANY) {
+        $company = $user->companies()->first();
+        $offlineTokenHours = $company?->offline_token_hours ?? 24;
+    } elseif ($user->role === \App\Enums\UserRole::SELLER) {
+        $seller = $user->sellers()->first();
+        $company = $seller?->company;
+        $offlineTokenHours = $company?->offline_token_hours ?? 24;
+    }
     
     if ($activeSession && !$isDemoUser) {
         if ($request->boolean('force_logout', false)) {
@@ -136,63 +156,35 @@ class AuthController extends Controller
         }
     }
 
-    // Crear nuevo token con expiración basada en suscripción
+    // Crear nuevo token con expiración basada en horas offline configuradas por empresa
     $deviceName = $request->device_name ?? 'api-token';
 
-    // Obtener suscripción activa del usuario
-    $subscriptions = $user->activeSubscription();
+    // La expiración del token se basa en offline_token_hours de la empresa
+    $tokenExpiresAt = now()->addHours($offlineTokenHours);
 
-    // Determinar fecha de expiración del token
-    $tokenExpiresAt = now()->addDays(30); // Por defecto 30 días
+    // Obtener suscripción activa del usuario (para info adicional en la respuesta)
+    $subscriptions = $user->activeSubscription();
     $subscriptionData = null;
 
-    /*if ($subscription) {
-        // El token expira cuando expire la suscripción
-        $tokenExpiresAt = $subscription->expires_at;
-
-        $subscriptionData = [
-            'plan' => $subscription->plan,
-            'plan_name' => $subscription->plan_name,
-            'status' => $subscription->status,
-            'expires_at' => $subscription->expires_at?->toIso8601String(),
-            'days_remaining' => $subscription->days_remaining,
-            'features' => $subscription->features,
-            'companies' => $subscription->company,
-        ];
-
-        // Si la suscripción está expirada, marcarla
-        if ($subscription->isExpired()) {
-            $subscription->markAsExpired();
-        }
-    }*/
-    
     if ($subscriptions && $subscriptions->isNotEmpty()) {
-    // 1. Transformamos la colección a un array estructurado
-    $subscriptionData = $subscriptions->map(function ($sub) {
-        
-        // Ejecutar lógica de expiración si el método existe
-        if (method_exists($sub, 'isExpired') && $sub->isExpired()) {
-            $sub->markAsExpired();
-        }
+        // 1. Transformamos la colección a un array estructurado
+        $subscriptionData = $subscriptions->map(function ($sub) {
+            // Ejecutar lógica de expiración si el método existe
+            if (method_exists($sub, 'isExpired') && $sub->isExpired()) {
+                $sub->markAsExpired();
+            }
 
-        return [
-            'plan'           => $sub->plan,
-            'plan_name'      => $sub->plan_name,
-            'status'         => $sub->status,
-            // Si PHP es < 8.0, el ?-> dará error. Usamos una condición normal:
-            'expires_at'     => $sub->expires_at ? $sub->expires_at->toIso8601String() : null,
-            'days_remaining' => $sub->days_remaining,
-            'features'       => $sub->features,
-            'companies'      => $sub->company, 
-        ];
-    })->toArray();
-
-    // 2. Ajustar la expiración del token
-    $maxExpiry = $subscriptions->max('expires_at');
-    if ($maxExpiry) {
-        $tokenExpiresAt = $maxExpiry;
+            return [
+                'plan'           => $sub->plan,
+                'plan_name'      => $sub->plan_name,
+                'status'         => $sub->status,
+                'expires_at'     => $sub->expires_at ? $sub->expires_at->toIso8601String() : null,
+                'days_remaining' => $sub->days_remaining,
+                'features'       => $sub->features,
+                'companies'      => $sub->company,
+            ];
+        })->toArray();
     }
-}
 
     // Crear token con fecha de expiración personalizada
     $tokenResult = $user->createToken($deviceName, ['*'], $tokenExpiresAt);
@@ -246,6 +238,7 @@ class AuthController extends Controller
             ],
             'token' => $token,
             'token_expires_at' => $tokenExpiresAt?->toIso8601String(),
+            'offline_hours' => $offlineTokenHours,
         ];
 
         // Agregar información de suscripción si existe
@@ -305,6 +298,34 @@ class AuthController extends Controller
                 'avatar' => $user->avatar,
                 'created_at' => $user->created_at,
             ]
+        ]);
+    }
+
+    /**
+     * Obtener estado del token actual
+     * GET /api/auth/token-status
+     */
+    public function tokenStatus(Request $request)
+    {
+        $token = $request->user()->currentAccessToken();
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hay token activo'
+            ], 401);
+        }
+
+        $expiresAt = $token->expires_at;
+        $remainingSeconds = $expiresAt
+            ? now()->diffInSeconds($expiresAt, false)
+            : 0;
+
+        return response()->json([
+            'success' => true,
+            'expires_at' => $expiresAt?->toIso8601String(),
+            'remaining_seconds' => max(0, $remainingSeconds),
+            'is_expired' => $expiresAt?->isPast() ?? false,
         ]);
     }
 
