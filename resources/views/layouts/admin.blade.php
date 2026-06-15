@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin - Chrystal Mobile')</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
@@ -43,6 +44,14 @@
       </svg>
       Usuarios
   </a>
+
+            <a href="{{ route('admin.sync-versions') }}"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ request()->routeIs('admin.sync-versions*') ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                Versiones
+            </a>
 
             <a href="{{ route('admin.docs') }}"
                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium {{ request()->routeIs('admin.docs') ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
@@ -101,6 +110,7 @@
                     <a href="{{ route('admin.accesos') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Empresas</a>
                     @if(auth()->check() && auth()->user()->role->value === 'manager')
                         <a href="{{ route('admin.usuarios') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Usuarios</a>
+                        <a href="{{ route('admin.sync-versions') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Versiones</a>
                         <a href="{{ route('admin.docs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Docs</a>
                     @endif
                     <form method="POST" action="{{ route('logout') }}" class="border-t border-gray-100 pt-1">
@@ -140,5 +150,54 @@
         </main>
     </div>
 </div>
+
+{{-- Auto-logout por inactividad (minutos desde .env: SESSION_LIFETIME) --}}
+<script>
+(function() {
+    var INACTIVITY_LIMIT = {{ config('session.lifetime', 120) }} * 60 * 1000;
+    var inactivityTimer;
+    var warningTimer;
+
+    console.log('[Inactividad] Límite configurado: ' + (INACTIVITY_LIMIT / 60000) + ' minutos');
+
+    function redirectToLogin() {
+        console.log('[Inactividad] Tiempo excedido, redirigiendo al login...');
+        // La sesión ya expiró, redirigir directamente al login
+        window.location.href = '{{ url("/login?session=expired") }}';
+    }
+
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        clearTimeout(warningTimer);
+
+        console.log('[Inactividad] Timer reiniciado por actividad del usuario');
+
+        warningTimer = setTimeout(function() {
+            console.log('[Inactividad] Mostrando aviso de expiración inminente');
+            var warning = document.getElementById('session-warning');
+            if (!warning) {
+                warning = document.createElement('div');
+                warning.id = 'session-warning';
+                warning.style.cssText = 'position:fixed;bottom:4rem;right:1rem;z-index:9999;padding:1rem 1.5rem;background:#fff3cd;border:1px solid #ffc107;border-radius:0.5rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:0.875rem;color:#856404;max-width:300px;';
+                warning.innerHTML = '<strong>Sesión por expirar</strong><p style="margin:0.25rem 0 0;font-size:0.8rem;">Serás redirigido al login en 30 segundos por inactividad.</p>';
+                document.body.appendChild(warning);
+            }
+        }, INACTIVITY_LIMIT - 30000);
+
+        inactivityTimer = setTimeout(redirectToLogin, INACTIVITY_LIMIT);
+    }
+
+    ['mousedown'].forEach(function(event) {
+        document.addEventListener(event, function() {
+            var warning = document.getElementById('session-warning');
+            if (warning) warning.remove();
+            resetInactivityTimer();
+        });
+    });
+
+    resetInactivityTimer();
+})();
+</script>
+
 </body>
 </html>

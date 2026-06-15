@@ -4,6 +4,59 @@
 
 @push('scripts')
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script>
+    (function() {
+        const SESSION_LIFETIME = {{ config('session.lifetime', 120) }} * 60 * 1000; // ms
+        let refreshTimer = null;
+        let pageLoadTime = Date.now();
+
+        async function refreshCsrfToken() {
+            try {
+                const response = await fetch('{{ route("login") }}/refresh-csrf', {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.token) {
+                        document.querySelector('meta[name="csrf-token"]').setAttribute('content', data.token);
+                        document.querySelector('input[name="_token"]').value = data.token;
+                        pageLoadTime = Date.now();
+                        console.log('[CSRF] Token actualizado');
+                    }
+                }
+            } catch (e) {
+                console.error('[CSRF] Error al actualizar token:', e);
+            }
+        }
+
+        function startRefreshTimer() {
+            clearTimeout(refreshTimer);
+            const timeUntilExpiry = SESSION_LIFETIME - (Date.now() - pageLoadTime);
+            const refreshBeforeExpiry = Math.max(timeUntilExpiry - 60000, 30000);
+            refreshTimer = setTimeout(refreshCsrfToken, refreshBeforeExpiry);
+        }
+
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && (Date.now() - pageLoadTime) > SESSION_LIFETIME * 0.8) {
+                refreshCsrfToken();
+            }
+        });
+
+        const form = document.querySelector('form');
+        if (form) {
+            ['focus', 'input', 'click'].forEach(event => {
+                form.addEventListener(event, function() {
+                    if ((Date.now() - pageLoadTime) > SESSION_LIFETIME * 0.8) {
+                        refreshCsrfToken();
+                    }
+                }, { once: true });
+            });
+        }
+
+        startRefreshTimer();
+    })();
+    </script>
 @endpush
 
 @section('content')

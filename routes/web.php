@@ -80,14 +80,17 @@ Route::get('health', function () {
 Route::get('/', [AdminController::class, 'loginForm'])->name('home');
 Route::get('/login', [AdminController::class, 'loginForm'])->name('login');
 Route::post('/login', [AdminController::class, 'login']);
+Route::get('/login/refresh-csrf', [AdminController::class, 'refreshCsrfToken'])->name('login.refresh-csrf');
 
 // Panel de administración (admin y manager pueden ver accesos)
 Route::middleware(['auth', 'admin.or.manager'])->prefix('admin')->group(function () {
     Route::get('/accesos', [AdminController::class, 'index'])->name('admin.accesos');
+    Route::get('/accesos/search', [AdminController::class, 'searchAccesosJson'])->name('admin.accesos.search');
     Route::post('/accesos', [AdminController::class, 'store'])->name('admin.accesos.store');
     Route::match(['post', 'put'], '/accesos/{id}', [AdminController::class, 'update'])->name('admin.accesos.update');
     Route::post('/accesos/{id}/edit-data', [AdminController::class, 'editData'])->name('admin.accesos.edit-data');
     Route::post('/accesos/{id}/toggle-block', [AdminController::class, 'toggleBlock'])->name('admin.accesos.toggle-block');
+    Route::delete('/accesos/{id}', [AdminController::class, 'destroy'])->name('admin.accesos.destroy');
     Route::post('/sellers/{id}/toggle-mobilecheck', [AdminController::class, 'toggleMobilecheck'])->name('admin.sellers.toggle-mobilecheck');
     Route::put('/companies/{id}/offline-hours', [AdminController::class, 'updateOfflineHours'])->name('admin.companies.offline-hours');
     Route::post('/logout', [AdminController::class, 'logout'])->name('logout');
@@ -103,4 +106,11 @@ Route::middleware(['auth', 'manager'])->prefix('admin')->group(function () {
       Route::put('/usuarios/{id}', [AdminController::class, 'updateUsuario'])->name('admin.usuarios.update');
       Route::delete('/usuarios/{id}', [AdminController::class, 'destroyUsuario'])->name('admin.usuarios.destroy');
       Route::get('/docs', [AdminController::class, 'docs'])->name('admin.docs');
+
+      // Versiones de app para sincronización
+      Route::get('/sync-versions', [AdminController::class, 'syncVersions'])->name('admin.sync-versions');
+      Route::post('/sync-versions', [AdminController::class, 'storeSyncVersion'])->name('admin.sync-versions.store');
+      Route::post('/sync-versions/{id}/edit-data', [AdminController::class, 'editSyncVersionData'])->name('admin.sync-versions.edit-data');
+      Route::put('/sync-versions/{id}', [AdminController::class, 'updateSyncVersion'])->name('admin.sync-versions.update');
+      Route::delete('/sync-versions/{id}', [AdminController::class, 'destroySyncVersion'])->name('admin.sync-versions.destroy');
 });
