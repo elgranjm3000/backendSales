@@ -28,6 +28,8 @@
           $request->validate([
               'rif' => 'required|string|max:50',
               'email' => 'required|email|max:255',
+              'app_version_chrystal' => 'nullable|string|max:20',
+              'uuid_hard_drive' => 'nullable|string|max:100',
           ]);
           
           $emailLower = Str::lower($request->email);
@@ -48,8 +50,16 @@
                             ->first();
 
           if ($company) {
-              // Verificar si el usuario ya tiene suscripción para esta compañía
-             
+              $updateData = [];
+              if ($request->filled('app_version_chrystal')) {
+                  $updateData['app_version_chrystal'] = $request->app_version_chrystal;
+              }
+              if ($request->filled('uuid_hard_drive')) {
+                  //$updateData['uuid_hard_drive'] = $request->uuid_hard_drive;
+              }
+              if (!empty($updateData)) {
+                  $company->update($updateData);
+              }
 
               return response()->json([
                   'success' => true,
@@ -59,7 +69,7 @@
                       'name' => $company->name,
                       'rif' => $company->rif,
                       'email' => $company->email,
-                  ],                  
+                  ],
                   'message' => 'Company validada'
               ], 200);
           }
@@ -74,6 +84,8 @@
               'phone'=>$acceso->telefono,
               'status' => 'active',
               'key_system_items_id' => 1, // Valor por defecto
+              'app_version_chrystal' => $request->app_version_chrystal,
+              'uuid_hard_drive' => $request->uuid_hard_drive,
           ]);
           
 

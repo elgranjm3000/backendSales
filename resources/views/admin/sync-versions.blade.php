@@ -141,11 +141,11 @@
                             <label for="form-version" class="block text-sm font-medium text-gray-700 mb-1.5">Versión *</label>
                             <input type="text" id="form-version" name="version" required
                                    :disabled="isEdit"
-                                   pattern="^\d+\.\d+\.\d+(-[a-z0-9]+)?$"
-                                   title="Formato: 1.0.0 o 1.0.0-beta"
+                                   pattern="^\d+\.\d+\.\d+(\.\d+)?(-[a-z0-9]+)?$"
+                                   title="Formato: 1.0.0, 1.0.2.9 o 1.0.0-beta"
                                    class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-900 bg-white"
-                                   placeholder="Ej: 1.0.0">
-                            <p class="text-xs text-gray-400 mt-1">Formato: mayor.minor.patch (ej: 1.0.0)</p>
+                                   placeholder="Ej: 1.0.0 o 1.0.2.9">
+                            <p class="text-xs text-gray-400 mt-1">Formato: mayor.minor.patch o mayor.minor.patch.build (ej: 1.0.2.9)</p>
                         </div>
 
                         <div>

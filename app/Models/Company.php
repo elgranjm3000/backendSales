@@ -33,7 +33,9 @@ class Company extends Model
         'main_image_type',
         'status',
         'rif',
-        'offline_token_hours'
+        'offline_token_hours',
+        'app_version_chrystal',
+        'uuid_hard_drive'
     ];
 
     /**

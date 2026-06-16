@@ -3,6 +3,38 @@
 @section('title', 'Empresas - Chrystal Mobile')
 
 @section('content')
+<style>
+    @media (max-width: 767px) {
+        .table-responsive thead { display: none; }
+        .table-responsive tr {
+            display: block;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background: #fff;
+        }
+        .table-responsive td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border: none !important;
+            text-align: right;
+        }
+        .table-responsive td:empty { display: none; }
+        .table-responsive td::before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-right: 1rem;
+            text-align: left;
+        }
+    }
+</style>
 <div x-data="accesosData()" x-init="init()" class="p-6">
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -24,15 +56,16 @@
             <div class="flex flex-col lg:flex-row gap-3">
                 <input type="text" name="search" value="{{ request('search') }}"
                        class="flex-1 lg:flex-none lg:w-64 px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none transition-all focus:border-gray-900 bg-white"
-                       placeholder="Buscar...">
+                       placeholder="Buscar..."
+                       @input.debounce.400ms="$event.target.form.submit()">
                 <div class="flex flex-col sm:flex-row gap-3">
-                    <select name="filter" class="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-600 outline-none transition-all focus:border-gray-900 min-w-[140px]">
+                    <select name="filter" @change="this.form.submit()" class="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-600 outline-none transition-all focus:border-gray-900 min-w-[140px]">
                         <option value="">Estado empresa</option>
                         <option value="active" {{ request('filter') === 'active' ? 'selected' : '' }}>Activos</option>
                         <option value="blocked" {{ request('filter') === 'blocked' ? 'selected' : '' }}>Bloqueados</option>
                         <option value="no_key" {{ request('filter') === 'no_key' ? 'selected' : '' }}>Sin API key</option>
                     </select>
-                    <select name="sync" class="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-600 outline-none transition-all focus:border-gray-900 min-w-[140px]">
+                    <select name="sync" @change="this.form.submit()" class="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-600 outline-none transition-all focus:border-gray-900 min-w-[140px]">
                         <option value="">Sincronización</option>
                         <option value="synced" {{ request('sync') === 'synced' ? 'selected' : '' }}>Sincronizados</option>
                         <option value="unsynced" {{ request('sync') === 'unsynced' ? 'selected' : '' }}>No sincronizados</option>
@@ -48,7 +81,7 @@
     {{-- Tabla --}}
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-responsive">
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Empresa</th>
@@ -57,6 +90,8 @@
                         <th class="text-left px-4 py-3 font-medium text-gray-600">API Key</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Vendedores</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Horas Offline</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-600">Versión Chrystal</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-600">UUID Dispositivo</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
                         <th class="text-center px-4 py-3 font-medium text-gray-600">Acciones</th>
                     </tr>
@@ -64,14 +99,14 @@
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($accesos as $acceso)
                         <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Empresa">
                                 <div class="font-medium text-gray-900">{{ $acceso->nombre ?: 'Sin nombre' }}</div>
                                 @if($acceso->correo_electronico)
                                     <div class="text-xs text-gray-500 mt-0.5">{{ $acceso->correo_electronico }}</div>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ $acceso->codigo }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 text-gray-600 font-mono text-xs" data-label="RIF">{{ $acceso->codigo }}</td>
+                            <td class="px-4 py-3" data-label="Sincronización">
                                 @if($acceso->correo_electronico && in_array($acceso->correo_electronico, $registeredEmails ?? []))
                                     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700" title="Email existe en tabla companies">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +123,7 @@
                                     </span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="API Key">
                                 @if($acceso->api_key)
                                     <div x-data="{ show: false, copied: false }" class="flex items-center gap-2">
                                         <code x-text="show ? '{{ $acceso->api_key }}' : '{{ substr($acceso->api_key, 0, 8) }}...'" class="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded font-mono cursor-pointer hover:bg-gray-200 transition-colors" @click="show = !show"></code>
@@ -105,7 +140,7 @@
                                     <span class="text-xs text-gray-400">Sin key</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Vendedores">
                                 @if($acceso->company && $acceso->company->sellers->isNotEmpty())
                                     <button @click="showVendorsModal = true; currentSellers = {{ $acceso->company->sellers->map(fn($s) => ['id' => $s->id, 'description' => $s->description, 'email' => $s->user->email ?? $s->code, 'mobilecheck' => !!$s->mobilecheck])->toJson() }}" class="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,13 +152,12 @@
                                     <span class="text-sm text-gray-400">0 vendedores</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Offline">
                                 @if($acceso->company)
                                     <div class="flex items-center gap-2">
                                         <input type="number"
                                                value="{{ $acceso->company->offline_token_hours ?? 24 }}"
-                                               min="1"
-                                               max="720"
+                                               min="1" max="720"
                                                class="w-20 px-2 py-1 border border-gray-200 rounded text-sm text-center"
                                                onchange="updateOfflineHours({{ $acceso->company->id }}, this.value)">
                                         <span class="text-xs text-gray-500">hs</span>
@@ -132,7 +166,35 @@
                                     <span class="text-xs text-gray-400">-</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Chrystal">
+                                @if($acceso->company && $acceso->company->app_version_chrystal)
+                                    <span class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded">{{ $acceso->company->app_version_chrystal }}</span>
+                                @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3" data-label="UUID">
+                                @if($acceso->company && $acceso->company->uuid_hard_drive)
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded" title="{{ $acceso->company->uuid_hard_drive }}">{{ substr($acceso->company->uuid_hard_drive, 0, 12) }}...</span>
+                                        <form method="POST" action="{{ route('admin.companies.reset-uuid', $acceso->company->id) }}" class="inline" @submit.prevent="confirmAction($event, '¿Resetear UUID del dispositivo? La empresa podrá sincronizar desde un nuevo equipo.', 'Resetear', 'bg-red-600 hover:bg-red-700')">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="hidden" name="search" value="{{ request('search') }}">
+                                            <input type="hidden" name="filter" value="{{ request('filter') }}">
+                                            <input type="hidden" name="sync" value="{{ request('sync') }}">
+                                            <button type="submit" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors" title="Resetear UUID (cambio de disco)">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    </div>
+                                @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3" data-label="Estado">
                                 @if($acceso->blocked_at)
                                     <div class="flex items-center gap-1.5">
                                         <span class="w-2 h-2 rounded-full bg-red-500"></span>
@@ -146,7 +208,7 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Acciones">
                                 <div class="flex items-center justify-center gap-2">
                                     <button @click="openEdit({{ $acceso->id }})" :disabled="loading && editId === {{ $acceso->id }}" class="text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-lg transition-all disabled:opacity-50" title="Editar empresa">
                                         <svg x-show="!loading || editId !== {{ $acceso->id }}" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,12 +239,24 @@
                                             @endif
                                         </button>
                                     </form>
+                                    <form method="POST" action="{{ route('admin.accesos.destroy', $acceso->id) }}" class="inline" @submit.prevent="confirmAction($event, '¿Eliminar a {{ $acceso->nombre }}? Se eliminarán todos sus datos asociados.', 'Eliminar', 'bg-red-600 hover:bg-red-700')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="search" value="{{ request('search') }}">
+                                        <input type="hidden" name="filter" value="{{ request('filter') }}">
+                                        <input type="hidden" name="sync" value="{{ request('sync') }}">
+                                        <button type="submit" class="p-2 rounded-lg transition-all text-red-600 hover:text-red-700 hover:bg-red-100" title="Eliminar empresa">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                                            </svg>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-12 text-center">
+                            <td colspan="10" class="px-4 py-12 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>
@@ -334,6 +408,32 @@
             </div>
         </div>
     </div>
+
+    {{-- Confirm Modal --}}
+    <div @keydown.escape.window="confirmModal.open = false" x-cloak>
+        <div x-show="confirmModal.open" x-transition.opacity.duration.200ms class="fixed inset-0 bg-gray-900/40 z-50" @click="confirmModal.open = false"></div>
+        <div x-show="confirmModal.open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="bg-white border border-gray-200 rounded-lg w-full max-w-sm shadow-sm" @click.stop>
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-base font-semibold text-gray-900">Confirmar acción</h2>
+                    <button @click="confirmModal.open = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm text-gray-600" x-text="confirmModal.message"></p>
+                </div>
+                <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+                    <button @click="confirmModal.open = false" class="px-4 py-2 text-sm text-gray-600 font-medium hover:text-gray-900 transition-colors">
+                        Cancelar
+                    </button>
+                    <button @click="executeConfirm()" class="px-4 py-2 text-sm text-white font-medium rounded-lg transition-colors" :class="confirmModal.confirmClass" x-text="confirmModal.confirmText"></button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -348,6 +448,13 @@ function accesosData() {
         loading: false,
         showVendorsModal: false,
         currentSellers: [],
+        confirmModal: {
+            open: false,
+            message: '',
+            form: null,
+            confirmText: 'Confirmar',
+            confirmClass: 'bg-gray-900 hover:bg-gray-800'
+        },
         async openEdit(id) {
             this.loading = true;
             this.editId = id;
@@ -459,6 +566,19 @@ function accesosData() {
                 alert('Error al procesar la solicitud');
             }
         },
+        confirmAction(event, message, confirmText, confirmClass) {
+            this.confirmModal.message = message;
+            this.confirmModal.confirmText = confirmText;
+            this.confirmModal.confirmClass = confirmClass || 'bg-red-600 hover:bg-red-700';
+            this.confirmModal.form = event.target;
+            this.confirmModal.open = true;
+        },
+        executeConfirm() {
+            if (this.confirmModal.form) {
+                this.confirmModal.form.submit();
+            }
+            this.confirmModal.open = false;
+        },
         init() {
             const urlParams = new URLSearchParams(window.location.search);
             const editId = urlParams.get('edit');
@@ -519,5 +639,6 @@ window.updateOfflineHours = function(companyId, hours) {
         alert('Error al actualizar las horas offline');
     });
 };
+
 </script>
 @endsection

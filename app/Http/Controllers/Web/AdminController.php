@@ -568,6 +568,22 @@ class AdminController extends Controller
         }
     }
 
+    public function resetUuid(Request $request, $id)
+    {
+        try {
+            $company = Company::findOrFail($id);
+            $company->update(['uuid_hard_drive' => null]);
+
+            return redirect()->route('admin.accesos', [
+                'search' => $request->search,
+                'filter' => $request->filter,
+                'sync' => $request->sync,
+            ])->with('success', 'UUID del dispositivo reseteado. La empresa podrá sincronizar desde un nuevo equipo.');
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.accesos')->with('error', 'Error al resetear UUID: ' . $e->getMessage());
+        }
+    }
+
      public function usuarios(Request $request)
       {
           $query = User::whereIn('role', ['admin', 'manager', 'cajero'])->orderBy('name');
@@ -822,23 +838,25 @@ class AdminController extends Controller
       /**
        * Eliminar acceso y todos sus datos relacionados (users, company, sellers)
        */
-      public function destroy(Request $request, $id): JsonResponse
+      public function destroy(Request $request, $id)
       {
           // Solo usuarios con rol manager pueden eliminar
           if (Auth::user()->role->value !== 'manager') {
-              return response()->json([
-                  'success' => false,
-                  'message' => 'No tienes permisos para eliminar empresas.'
-              ], 403);
+              return redirect()->route('admin.accesos', [
+                  'search' => $request->search,
+                  'filter' => $request->filter,
+                  'sync' => $request->sync,
+              ])->with('error', 'No tienes permisos para eliminar empresas.');
           }
 
           $acceso = Acceso::findOrFail($id);
 
           if (!$acceso->correo_electronico) {
-              return response()->json([
-                  'success' => false,
-                  'message' => 'El acceso no tiene email asociado. No se puede eliminar de forma completa.'
-              ], 422);
+              return redirect()->route('admin.accesos', [
+                  'search' => $request->search,
+                  'filter' => $request->filter,
+                  'sync' => $request->sync,
+              ])->with('error', 'El acceso no tiene email asociado. No se puede eliminar.');
           }
 
           $email = $acceso->correo_electronico;
@@ -870,16 +888,18 @@ class AdminController extends Controller
               // 2. Eliminar el acceso
               $acceso->delete();
 
-              return response()->json([
-                  'success' => true,
-                  'message' => "{$nombre} y todos sus datos asociados han sido eliminados correctamente."
-              ]);
+              return redirect()->route('admin.accesos', [
+                  'search' => $request->search,
+                  'filter' => $request->filter,
+                  'sync' => $request->sync,
+              ])->with('success', "{$nombre} y todos sus datos asociados han sido eliminados correctamente.");
 
           } catch (\Throwable $e) {
-              return response()->json([
-                  'success' => false,
-                  'message' => 'Error al eliminar: ' . $e->getMessage()
-              ], 500);
+              return redirect()->route('admin.accesos', [
+                  'search' => $request->search,
+                  'filter' => $request->filter,
+                  'sync' => $request->sync,
+              ])->with('error', 'Error al eliminar: ' . $e->getMessage());
           }
       }
 

@@ -93,6 +93,7 @@ Route::middleware(['auth', 'admin.or.manager'])->prefix('admin')->group(function
     Route::delete('/accesos/{id}', [AdminController::class, 'destroy'])->name('admin.accesos.destroy');
     Route::post('/sellers/{id}/toggle-mobilecheck', [AdminController::class, 'toggleMobilecheck'])->name('admin.sellers.toggle-mobilecheck');
     Route::put('/companies/{id}/offline-hours', [AdminController::class, 'updateOfflineHours'])->name('admin.companies.offline-hours');
+    Route::put('/companies/{id}/reset-uuid', [AdminController::class, 'resetUuid'])->name('admin.companies.reset-uuid');
     Route::post('/logout', [AdminController::class, 'logout'])->name('logout');
 });
 
