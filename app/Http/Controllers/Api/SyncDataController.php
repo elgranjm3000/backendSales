@@ -520,54 +520,27 @@ class SyncDataController extends Controller
             $errorCount = 0;
             $errors = [];
 
-            $pg->beginTransaction();
+            $upsertData = collect($sellers)->map(fn($seller) => [
+                'code' => $seller['code'],
+                'name' => $seller['name'],
+                'email' => $seller['email'] ?? null,
+                'phone' => $seller['phone'] ?? null,
+                'percent_sales' => $seller['percent_sales'] ?? 0,
+                'seller_status' => $seller['seller_status'] ?? 'active',
+                'company_id' => $companyId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])->toArray();
 
-            foreach ($sellers as $seller) {
-                try {
-                    $exists = $pg->table('sellers')
-                        ->where('code', $seller['code'])
-                        ->where('company_id', $companyId)
-                        ->first();
-
-                    $data = [
-                        'name' => $seller['name'],
-                        'email' => $seller['email'] ?? null,
-                        'phone' => $seller['phone'] ?? null,
-                        'percent_sales' => $seller['percent_sales'] ?? 0,
-                        'seller_status' => $seller['seller_status'] ?? 'active',
-                        'company_id' => $companyId,
-                        'updated_at' => now(),
-                    ];
-
-                    if ($exists) {
-                        $pg->table('sellers')
-                            ->where('code', $seller['code'])
-                            ->where('company_id', $companyId)
-                            ->update($data);
-                        $updatedCount++;
-                    } else {
-                        $data['code'] = $seller['code'];
-                        $data['created_at'] = now();
-                        $pg->table('sellers')->insert($data);
-                        $insertedCount++;
-                    }
-                } catch (\Exception $e) {
-                    $errorCount++;
-                    $errors[] = [
-                        'code' => $seller['code'] ?? 'unknown',
-                        'error' => $e->getMessage()
-                    ];
-                }
-            }
-
-            $pg->commit();
+            $pg->table('sellers')->upsert(
+                $upsertData,
+                ['code', 'company_id'],
+                ['name', 'email', 'phone', 'percent_sales', 'seller_status', 'updated_at']
+            );
 
             Log::info('Sellers synced from Python', [
                 'company_id' => $companyId,
                 'total' => count($sellers),
-                'inserted' => $insertedCount,
-                'updated' => $updatedCount,
-                'errors' => $errorCount
             ]);
 
             return response()->json([
@@ -575,10 +548,6 @@ class SyncDataController extends Controller
                 'message' => 'Sellers synchronized successfully',
                 'data' => [
                     'total_processed' => count($sellers),
-                    'inserted' => $insertedCount,
-                    'updated' => $updatedCount,
-                    'errors' => $errorCount,
-                    'error_details' => $errors
                 ]
             ]);
 

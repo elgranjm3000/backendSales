@@ -228,6 +228,11 @@ class AdminController extends Controller
                             'mobilecheck' => (bool) $s->mobilecheck,
                         ])->toArray(),
                     ] : null,
+                    'last_sync_at' => $acceso->company
+                        ? \App\Models\BatchSyncLog::where('company_id', $acceso->company->id)
+                            ->where('status', 'completed')
+                            ->max('completed_at')
+                        : null,
                 ];
             }),
             'registered_emails' => $registeredEmails,
@@ -572,15 +577,21 @@ class AdminController extends Controller
     {
         try {
             $company = Company::findOrFail($id);
-            $company->update(['uuid_hard_drive' => null]);
+
+            // Eliminar usuario asociado a la empresa
+            if ($company->user) {
+                $company->user->delete();
+            }
+
+            $company->delete();
 
             return redirect()->route('admin.accesos', [
                 'search' => $request->search,
                 'filter' => $request->filter,
                 'sync' => $request->sync,
-            ])->with('success', 'UUID del dispositivo reseteado. La empresa podrá sincronizar desde un nuevo equipo.');
+            ])->with('success', 'Empresa y usuario eliminados. Podrá sincronizar desde un nuevo equipo.');
         } catch (\Throwable $e) {
-            return redirect()->route('admin.accesos')->with('error', 'Error al resetear UUID: ' . $e->getMessage());
+            return redirect()->route('admin.accesos')->with('error', 'Error al eliminar: ' . $e->getMessage());
         }
     }
 

@@ -92,6 +92,7 @@
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Horas Offline</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Versión Chrystal</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">UUID Dispositivo</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-600">Última sinc.</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
                         <th class="text-center px-4 py-3 font-medium text-gray-600">Acciones</th>
                     </tr>
@@ -159,8 +160,12 @@
                                                value="{{ $acceso->company->offline_token_hours ?? 24 }}"
                                                min="1" max="720"
                                                class="w-20 px-2 py-1 border border-gray-200 rounded text-sm text-center"
-                                               onchange="updateOfflineHours({{ $acceso->company->id }}, this.value)">
+                                               id="hours-{{ $acceso->company->id }}">
                                         <span class="text-xs text-gray-500">hs</span>
+                                        <button onclick="applyOfflineHours({{ $acceso->company->id }})"
+                                                class="px-2.5 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors">
+                                            Aplicar
+                                        </button>
                                     </div>
                                 @else
                                     <span class="text-xs text-gray-400">-</span>
@@ -177,19 +182,32 @@
                                 @if($acceso->company && $acceso->company->uuid_hard_drive)
                                     <div class="flex items-center gap-1.5">
                                         <span class="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded" title="{{ $acceso->company->uuid_hard_drive }}">{{ substr($acceso->company->uuid_hard_drive, 0, 12) }}...</span>
-                                        <form method="POST" action="{{ route('admin.companies.reset-uuid', $acceso->company->id) }}" class="inline" @submit.prevent="confirmAction($event, '¿Resetear UUID del dispositivo? La empresa podrá sincronizar desde un nuevo equipo.', 'Resetear', 'bg-red-600 hover:bg-red-700')">
+                                        <form method="POST" action="{{ route('admin.companies.reset-uuid', $acceso->company->id) }}" class="inline" @submit.prevent="confirmAction($event, '¿Eliminar empresa de companies? Se borrarán todos sus datos asociados (productos, clientes, etc.). La empresa podrá sincronizar desde cero.', 'Eliminar', 'bg-red-600 hover:bg-red-700')">
                                             @csrf
                                             @method('PUT')
                                             <input type="hidden" name="search" value="{{ request('search') }}">
                                             <input type="hidden" name="filter" value="{{ request('filter') }}">
                                             <input type="hidden" name="sync" value="{{ request('sync') }}">
-                                            <button type="submit" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors" title="Resetear UUID (cambio de disco)">
+                                            <button type="submit" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors" title="Eliminar empresa de companies (sincronizará desde cero)">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                                 </svg>
                                             </button>
                                         </form>
                                     </div>
+                                @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3" data-label="Última sinc.">
+                                @php
+                                    $lastSync = $acceso->company ? \App\Models\BatchSyncLog::where('company_id', $acceso->company->id)->where('status', 'completed')->max('completed_at') : null;
+                                @endphp
+                                @if($lastSync)
+                                    @php $lastSyncDate = \Carbon\Carbon::parse($lastSync); @endphp
+                                    <span class="text-xs text-gray-600" title="{{ $lastSyncDate->format('d/m/Y h:i A') }}">
+                                        {{ $lastSyncDate->format('d/m/Y h:i A') }}
+                                    </span>
                                 @else
                                     <span class="text-xs text-gray-400">-</span>
                                 @endif
@@ -256,7 +274,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-4 py-12 text-center">
+                            <td colspan="11" class="px-4 py-12 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>
@@ -609,7 +627,22 @@ window.toggleMobilecheck = function(sellerId) {
     });
 };
 
-window.updateOfflineHours = function(companyId, hours) {
+window.applyOfflineHours = function(companyId) {
+    const input = document.getElementById('hours-' + companyId);
+    if (!input) return;
+
+    const hours = parseInt(input.value);
+    if (!hours || hours < 1) {
+        alert('Mínimo 1 hora');
+        input.focus();
+        return;
+    }
+    if (hours > 720) {
+        alert('Máximo 720 horas (30 días)');
+        input.focus();
+        return;
+    }
+
     const metaTag = document.querySelector('meta[name="csrf-token"]');
     const csrfToken = metaTag ? metaTag.getAttribute('content') : document.querySelector('input[name="_token"]')?.value;
 
@@ -619,12 +652,11 @@ window.updateOfflineHours = function(companyId, hours) {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrfToken
         },
-        body: JSON.stringify({ offline_token_hours: parseInt(hours) })
+        body: JSON.stringify({ offline_token_hours: hours })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Mostrar notificación simple
             const notification = document.createElement('div');
             notification.className = 'fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
             notification.textContent = data.message;

@@ -29,7 +29,7 @@ class ProductController extends Controller
               ->when($request->low_stock, fn($q) => $q->lowStock())
               ->when($request->search, fn($q) => $q->search($request->search))
               ->when($request->description, function($q) use ($request) {
-                        $q->whereRaw('LOWER(description) LIKE ?', [Str::lower($request->description) . '%']);
+                        $q->whereRaw('LOWER(description) LIKE ?', ['%' .Str::lower($request->description) . '%']);
               })
               ->when($request->code, function($q) use ($request) {
                         $q->whereRaw('LOWER(code) LIKE ?', [Str::lower($request->code) . '%']);

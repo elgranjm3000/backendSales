@@ -55,7 +55,7 @@
                   $updateData['app_version_chrystal'] = $request->app_version_chrystal;
               }
               if ($request->filled('uuid_hard_drive')) {
-                  //$updateData['uuid_hard_drive'] = $request->uuid_hard_drive;
+                  $updateData['uuid_hard_drive'] = $request->uuid_hard_drive;
               }
               if (!empty($updateData)) {
                   $company->update($updateData);
@@ -582,10 +582,14 @@
 
                       }
 
-                      // Buscar seller por (user_id, company_id) - clave única real
-                      $seller = Seller::where('user_id', $user->id)
-                          ->where('company_id', $companyId)
+                      // Buscar seller por (company_id, code) que es el unique key real
+                      $seller = Seller::where('company_id', $companyId)
+                          ->where('code', $sellerData['code'])
                           ->first();
+
+                      if ($seller && $seller->user_id != $user->id) {
+                          $sellerData['user_id'] = $user->id;
+                      }
 
                       $sellerData['user_id'] = $user->id;
                       unset($sellerData['email'], $sellerData['password']);
