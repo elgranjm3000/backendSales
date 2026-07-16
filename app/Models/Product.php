@@ -42,6 +42,7 @@ class Product extends Model
         'buy_tax',
         'buy_aliquot',
         'unidad',
+        'unit',
         'allow_decimal',
         'image_type',
         'product_image'
