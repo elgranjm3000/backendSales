@@ -199,6 +199,7 @@
                       // Buscar producto por code + company_id
                       $product = Product::where('code', $productData['code'])
                           ->where('company_id', $companyId)
+                          ->where('unit', $productData['unit'])
                           ->first();
 
                       if ($product) {

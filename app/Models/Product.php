@@ -22,6 +22,7 @@ class Product extends Model
         'code',
         'description',
         'price',
+        'minimum_price',
         'cost',
         'stock',
         'min_stock',
@@ -50,6 +51,7 @@ class Product extends Model
 
     protected $casts = [
         'price' => 'decimal:6',
+        'minimum_price' => 'decimal:2',
         'cost' => 'decimal:6',
         'weight' => 'decimal:6',
         'stock' => 'decimal:6',
