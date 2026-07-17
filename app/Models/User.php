@@ -26,6 +26,8 @@ class User extends Authenticatable
         'role',
         'status',
         'avatar',
+        'profile',
+        'system_value',
         'password'
     ];
 
@@ -49,6 +51,7 @@ class User extends Authenticatable
         'password' => 'hashed',
         'role' => UserRole::class,
         'status' => GenericStatus::class,
+        'system_value' => 'array',
     ];
 
     /**

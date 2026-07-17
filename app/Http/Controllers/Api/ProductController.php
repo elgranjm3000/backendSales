@@ -23,6 +23,7 @@ class ProductController extends Controller
           $query = Product::query()
               ->with(['company:id,name', 'category:id,description'])
               ->where('status', 'active')
+              ->where('unit', '00')
               ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
               ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
               ->when($request->status, fn($q) => $q->where('status', $request->status))
@@ -39,7 +40,106 @@ class ProductController extends Controller
           $paginated = $query->reorder()
                    ->orderByRaw('LOWER(name) ASC')
                    ->paginate($perPage);
-        
+
+          // Obtener todas las unidades disponibles para cada código (evitar N+1)
+          $productCodes = collect($paginated->items())->pluck('code')->unique();
+          $allUnitsByCode = [];
+          if ($productCodes->isNotEmpty()) {
+              $units = Product::whereIn('code', $productCodes)
+                  ->where('status', 'active')
+                  ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
+                  ->select('code', 'unit', 'unidad', 'price', 'cost', 'higher_price', 'minimum_price')
+                  ->get();
+              $allUnitsByCode = $units->groupBy('code')->map(fn($items) => $items->map(fn($unit) => [
+                  'unit' => $unit->unit,
+                  'unidad' => $unit->unidad,
+                  'price' => (string) $unit->price,
+                  'cost' => (string) $unit->cost,
+                  'higher_price' => (string) $unit->higher_price,
+                  'minimum_price' => (string) $unit->minimum_price,
+              ])->values()->toArray());
+          }
+
+            // Convertir a colección y agregar image_url y available_units
+         $products = collect($paginated->items())->map(function ($product) use ($allUnitsByCode) {
+                    // 1. Extraemos los bytes del recurso de PostgreSQL si es que viene como un resource de PHP
+                    $binaryData = $product->product_image;
+                    if (is_resource($binaryData)) {
+                        $binaryData = stream_get_contents($binaryData);
+                    }
+
+                    // 2. Ocultamos temporalmente el campo binario original para que $product->toArray() no se rompa
+                    $product->makeHidden(['product_image']);
+                    $productArray = $product->toArray();
+
+                    // 3. Agregar tu URL en Base64 utilizando los bytes ya limpios
+                     $mimeType = $product->image_type;
+                      if (!str_contains($mimeType, '/')) {
+                          // Es solo el tipo (jpg, png), agregar prefix
+                          $mimeType = 'image/' . $mimeType;
+                      }
+
+                      if ($mimeType && $binaryData) {
+                          $productArray['image_url'] = "data:{$mimeType};base64," . base64_encode($binaryData);
+                      } else {
+                          $productArray['image_url'] = null;
+                      }
+
+                    // 4. Agregar unidades disponibles para este código con precios
+                    $productArray['available_units'] = $allUnitsByCode[$product->code] ?? [[
+                        'unit' => $product->unit,
+                        'unidad' => $product->unidad,
+                        'price' => (string) $product->price,
+                        'cost' => (string) $product->cost,
+                        'higher_price' => (string) $product->higher_price,
+                        'minimum_price' => (string) $product->minimum_price,
+                    ]];
+
+                    return $productArray;
+        });
+
+
+          // ✅ Devolver en formato compatible con el frontend existente
+          return response()->json([
+              'success' => true,
+              'data' => $products, // Solo el array de productos
+              'pagination' => [
+                  'current_page' => $paginated->currentPage(),
+                  'per_page' => $paginated->perPage(),
+                  'total' => $paginated->total(),
+              ],
+              'message' => 'Productos obtenidos exitosamente'
+          ]);
+
+      } catch (\Exception $e) {
+          return response()->json([
+              'success' => false,
+              'message' => 'Error: ' . $e->getMessage()
+          ], 500);
+      }
+
+}
+
+
+/**
+     * Mostrar lista de productos
+     */
+    public function searcProductUnit(Request $request): JsonResponse
+    {
+         try {
+          $perPage = min(50, (int)($request->per_page ?? 50));
+
+          $query = Product::query()
+              ->with(['company:id,name', 'category:id,description'])
+              ->where('status', 'active')
+              ->where('unit', '!=', '00')
+              ->when($request->code, fn($q) => $q->where('code', $request->code))
+              ->when($request->unit, fn($q) => $q->where('unit', $request->unit));
+
+          $paginated = $query->reorder()
+                   ->orderByRaw('LOWER(name) ASC')
+                   ->paginate($perPage);
+
             // Convertir a colección y agregar image_url
          $products = collect($paginated->items())->map(function ($product) {
                     // 1. Extraemos los bytes del recurso de PostgreSQL si es que viene como un resource de PHP
@@ -47,25 +147,25 @@ class ProductController extends Controller
                     if (is_resource($binaryData)) {
                         $binaryData = stream_get_contents($binaryData);
                     }
-                
+
                     // 2. Ocultamos temporalmente el campo binario original para que $product->toArray() no se rompa
                     $product->makeHidden(['product_image']);
                     $productArray = $product->toArray();
-                
+
                     // 3. Agregar tu URL en Base64 utilizando los bytes ya limpios
                      $mimeType = $product->image_type;
                       if (!str_contains($mimeType, '/')) {
                           // Es solo el tipo (jpg, png), agregar prefix
                           $mimeType = 'image/' . $mimeType;
                       }
-                    
+
                       if ($mimeType && $binaryData) {
                           $productArray['image_url'] = "data:{$mimeType};base64," . base64_encode($binaryData);
                       } else {
                           $productArray['image_url'] = null;
                       }
 
-                
+
                     return $productArray;
         });
 
@@ -129,7 +229,7 @@ class ProductController extends Controller
      */
     public function show(Product $product,$id): JsonResponse
     {
-        
+
         $product = Product::with('company','category')->find($id);
 
         return response()->json([
