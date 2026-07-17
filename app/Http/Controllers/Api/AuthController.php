@@ -234,6 +234,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'status' => $user->status,
+                'system_value' => $user->system_value,
                 'companies' => $companiesData,
             ],
             'token' => $token,
