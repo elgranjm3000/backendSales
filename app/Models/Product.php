@@ -44,6 +44,7 @@ class Product extends Model
         'buy_aliquot',
         'unidad',
         'unit',
+        'main_unit',
         'allow_decimal',
         'image_type',
         'product_image'
