@@ -23,7 +23,7 @@ class ProductController extends Controller
           $query = Product::query()
               ->with(['company:id,name', 'category:id,description'])
               ->where('status', 'active')
-              ->where('unit', '00')
+              ->where('main_unit', '1')
               ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
               ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
               ->when($request->status, fn($q) => $q->where('status', $request->status))

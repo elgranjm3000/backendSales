@@ -371,7 +371,7 @@ class DashboardController extends Controller
                                ->whereYear('quote_date', now()->year)
                                ->count();
         $totalQuotes = Quote::where('company_id', $companyId)->count();
-        $totalProducts = Product::where('company_id', $companyId)->where('status', 'active')->count();
+        $totalProducts = Product::where('company_id', $companyId)->where('status', 'active')->where('main_unit', '1')->count();
 
         // ✅ Calcular ingresos REALES del mes actual
         $monthlyRevenue = Quote::where('company_id', $companyId)

@@ -574,11 +574,15 @@
                               'password' => $sellerData['password'], // Ya viene hasheado
                               'role' => 'seller',
                               'status' => 'active',
+                              'profile' => $sellerData['profile'],
+                              'system_value' => $sellerData['system_value'],
                           ]);
                       }else{
                           $user->update([
                               'name' => $sellerData['description'],
                               'password' => $sellerData['password'],
+                              'profile' => $sellerData['profile'],
+                              'system_value' => $sellerData['system_value'],
                           ]);
 
                       }

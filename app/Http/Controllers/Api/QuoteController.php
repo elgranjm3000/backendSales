@@ -256,7 +256,7 @@ class QuoteController extends Controller
                   'tax_amount' => $itemTaxAmount,
                   'type_price' => $item['type_price'] ?? 'default',
                   'item_type' => 'product',
-                  'unit' => $product->unidad ?? 'pcs',
+                  'unit' => $item['unit'] ?? 'pcs',
                   'sort_order' => $index + 1,
                   'subtotal' => $itemSubtotal,
               ]);

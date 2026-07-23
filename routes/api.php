@@ -136,6 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Rutas de productos (requieren suscripción con feature sync_products)
     Route::prefix('products')->group(function () {
         Route::get('/', [ProductController::class, 'index']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
+        Route::get('/searchProductUnit', [ProductController::class, 'searchProductUnit']);
         Route::post('/', [ProductController::class, 'store']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
         Route::get('{id}', [ProductController::class, 'show']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
         Route::put('{id}', [ProductController::class, 'update']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_products');
