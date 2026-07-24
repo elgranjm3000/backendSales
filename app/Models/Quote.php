@@ -13,7 +13,7 @@ class Quote extends Model
 
     protected $fillable = [
         'quote_number', 'customer_id', 'company_id', 'subtotal', 'tax',
-        'discount', 'total', 'status', 'notes', 'quote_date', 'valid_until',
+        'discount', 'total', 'status', 'operation_type', 'notes', 'quote_date', 'valid_until',
         'terms_conditions', 'sent_at', 'approved_at', 'metadata','user_seller_id',
         'tax_amount',     
         'discount_amount',
