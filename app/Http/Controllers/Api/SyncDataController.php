@@ -326,6 +326,7 @@ class SyncDataController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'company_id' => 'required|integer',
+            'operation_type' => 'nullable|string|in:BUDGET,ORDER',
             'quotes' => 'required|array|max:1000',
             'quotes.*.mysql_quote_id' => 'required|integer',
             'quotes.*.quote_number' => 'required|string|max:50',
@@ -377,6 +378,7 @@ class SyncDataController extends Controller
                         'mysql_quote_id' => $quote['mysql_quote_id'],
                         'synced_from_mysql' => true,
                         'updated_at' => now(),
+                        'operation_type' => $quote['operation_type'] ?? null,
                     ];
 
                     if ($exists) {

@@ -62,6 +62,10 @@ class QuoteController extends Controller
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }  
+
+        if ($request->has('operation_type')) {
+            $query->where('operation_type', $request->operation_type);
+        }
         
          if ($request->has('user_seller_id')) {
             $query->where('user_seller_id', $request->user_seller_id);
@@ -110,6 +114,7 @@ class QuoteController extends Controller
 
       $request->validate([
           'customer_id' => 'required|exists:customers,id',
+          'operation_type' => 'nullable|string|in:BUDGET,ORDER',
           'company_id' => 'required|exists:companies,id',
           'items' => 'required|array|min:1',
           'items.*.product_id' => 'required|exists:products,id',
@@ -214,6 +219,7 @@ class QuoteController extends Controller
               'metadata' => $request->metadata ?? [],
               'bcv_rate' => $request->bcv_rate ?? null,
               'bcv_date' => $request->bcv_date ?? null,
+             'operation_type' => $request->operation_type ?? 'BUDGET'
           ];
 
           if ($user->role == \App\Enums\UserRole::SELLER) {

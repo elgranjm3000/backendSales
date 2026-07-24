@@ -801,6 +801,7 @@
       {
           $request->validate([
               'company_id' => 'required|integer',
+              'operation_type' => 'nullable|string|in:BUDGET,ORDER',
               'quote_number' => 'required|string|max:50',
               'customer_id' => 'required|integer',
               'user_seller_id' => 'nullable|integer',
@@ -833,6 +834,7 @@
                   'status' => $request->status,
                   'created_at' => now(),
                   'updated_at' => now(),
+                  'operation_type' => $request->operation_type
               ]);
 
               // Crear items del quote
