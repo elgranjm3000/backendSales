@@ -17,6 +17,7 @@ class Customer extends Model
         'name',
         'email',
         'phone',
+        'sale_price',
         'document_type',
         'document_number',
         'address',
@@ -34,6 +35,7 @@ class Customer extends Model
     protected $casts = [
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
+        'sale_price' => 'decimal:6',
         'additional_info' => 'array',
         'status' => GenericStatus::class,
     ];
