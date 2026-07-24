@@ -922,6 +922,7 @@
               'company_id' => 'required|integer',
               'status' => 'nullable|string',
               'from_date' => 'nullable|date',
+              'operation_type' => 'nullable|string|in:BUDGET,ORDER'
           ]);
 
           $query = Quote::with(['items.product', 'customer', 'seller','sellerData'])
@@ -930,6 +931,10 @@
           if ($request->has('status')) {
               $query->where('status', $request->status);
           }
+
+           if ($request->has('operation_type')) {
+               $query->where('operation_type', $request->operation_type);
+           }
 
           if ($request->has('from_date')) {
               $query->where('created_at', '>=', $request->from_date);
