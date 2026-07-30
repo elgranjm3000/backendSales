@@ -456,6 +456,11 @@
           $sellers = $request->sellers;
           $companyId = $request->company_id;
 
+          // Obtener versión de la app de la compañía para determinar encriptación de contraseñas
+          $company = Company::where('id', $companyId)->first();
+          $appVersion = $company->app_version_chrystal ?? '0.0.0.0';
+          $requiresDecrypt = version_compare($appVersion, '1.0.2.9', '>');
+
           // Validar emails duplicados dentro del mismo batch
           $emails = array_column($sellers, 'email');
           $duplicateEmails = array_filter(array_count_values($emails), fn($count) => $count > 1);
@@ -561,17 +566,29 @@
               ], 422);
           }
 
-          DB::transaction(function () use ($sellers, $companyId, &$stats, &$errors) {
+          DB::transaction(function () use ($sellers, $companyId, $requiresDecrypt, &$stats, &$errors) {
               foreach ($sellers as $index => $sellerData) {
                   try {
                       // Buscar o crear usuario PRIMERO
                       $user = User::where('email', $sellerData['email'])->first();
 
+                      $password = $sellerData['password'];
+
+                      // Si la versión de la app es mayor a 1.0.2.9, la contraseña viene encriptada con AES/ECB
+                      if ($requiresDecrypt && !empty($password)) {
+                          $password = self::decryptAesEcb($password);
+                      }
+
+                      // Detectar si la contraseña viene en plano o ya hasheada
+                      if (!str_starts_with($password, '$2y$') || strlen($password) !== 60) {
+                          $password = bcrypt($password);
+                      }
+
                       if (!$user) {
                           $user = User::create([
                               'name' => $sellerData['description'],
                               'email' => $sellerData['email'],
-                              'password' => $sellerData['password'], // Ya viene hasheado
+                              'password' => $password,
                               'role' => 'seller',
                               'status' => 'active',
                               'profile' => $sellerData['profile'],
@@ -580,7 +597,7 @@
                       }else{
                           $user->update([
                               'name' => $sellerData['description'],
-                              'password' => $sellerData['password'],
+                              'password' => $password,
                               'profile' => $sellerData['profile'],
                               'system_value' => $sellerData['system_value'],
                           ]);
@@ -1084,5 +1101,22 @@
               'success' => true,
               'deleted' => $deleted
           ]);
+      }
+
+      /**
+       * Desencripta contraseñas AES/ECB/PKCS5Padding encriptadas desde la app Chrystal
+       * Clave secreta: %ZLe657VPT3YK%SB (16 bytes, AES-128)
+       */
+      private static function decryptAesEcb(string $encryptedText): string
+      {
+          $secretKey = '%ZLe657VPT3YK%SB';
+          $decrypted = openssl_decrypt(
+              base64_decode($encryptedText),
+              'aes-128-ecb',
+              $secretKey,
+              OPENSSL_RAW_DATA
+          );
+
+          return $decrypted !== false ? $decrypted : $encryptedText;
       }
   }
