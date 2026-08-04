@@ -12,6 +12,9 @@
   use App\Models\Acceso;        // Modelo en BD de la API
   use App\Models\Subscription;   // Modelo en BD de la API
   use App\Models\BatchSyncLog;   // Modelo para logs de sincronización
+  use App\Models\Store;
+  use App\Models\Location;
+  use App\Models\ProductsStock;
   use Illuminate\Http\Request;
   use Illuminate\Support\Facades\DB;
   use Illuminate\Support\Str;
@@ -1118,5 +1121,241 @@
           );
 
           return $decrypted !== false ? $decrypted : $encryptedText;
+      }
+
+      // ======================================================
+      // STORE BATCH
+      // ======================================================
+
+      public function getStores(Request $request)
+      {
+          $request->validate(['company_id' => 'required|integer']);
+          $stores = Store::where('company_id', $request->company_id)->get();
+          return response()->json(['success' => true, 'data' => $stores]);
+      }
+
+      public function syncStoresBatch(Request $request)
+      {
+          $request->validate([
+              'company_id' => 'required|integer',
+              'stores' => 'required|array|max:5000',
+              'stores.*.code' => 'required|string|max:100',
+          ]);
+
+          $stores = $request->stores;
+          $companyId = $request->company_id;
+          $stats = ['created' => 0, 'updated' => 0, 'errors' => 0];
+          $errors = [];
+
+          foreach ($stores as $index => $data) {
+              try {
+                  $store = Store::where('code', $data['code'])->where('company_id', $companyId)->first();
+
+                  if ($store) {
+                      $store->update($data);
+                      $stats['updated']++;
+                  } else {
+                      $data['company_id'] = $companyId;
+                      Store::create($data);
+                      $stats['created']++;
+                  }
+              } catch (\Exception $e) {
+                  $stats['errors']++;
+                  $errors[] = ['index' => $index, 'code' => $data['code'] ?? 'unknown', 'error' => $e->getMessage()];
+              }
+          }
+
+          return response()->json([
+              'success' => true,
+              'message' => count($stores) . ' tiendas procesadas',
+              'data' => ['stats' => $stats, 'errors' => $errors],
+          ]);
+      }
+
+      public function destroyStoresBatch(Request $request)
+      {
+          $request->validate(['company_id' => 'required|integer', 'codes' => 'required|array']);
+          $deleted = Store::where('company_id', $request->company_id)->whereIn('code', $request->codes)->delete();
+          return response()->json(['success' => true, 'deleted' => $deleted]);
+      }
+
+      // ======================================================
+      // LOCATIONS BATCH
+      // ======================================================
+
+      public function getLocations(Request $request)
+      {
+          $request->validate(['company_id' => 'required|integer']);
+          $locations = Location::where('company_id', $request->company_id)->get();
+          return response()->json(['success' => true, 'data' => $locations]);
+      }
+
+      public function syncLocationsBatch(Request $request)
+      {
+          $request->validate([
+              'company_id' => 'required|integer',
+              'locations' => 'required|array|max:5000',
+              'locations.*.code' => 'required|string|max:100',
+          ]);
+
+          $locations = $request->locations;
+          $companyId = $request->company_id;
+          $stats = ['created' => 0, 'updated' => 0, 'errors' => 0];
+          $errors = [];
+
+          foreach ($locations as $index => $data) {
+              try {
+                  $location = Location::where('code', $data['code'])->where('company_id', $companyId)->first();
+
+                  if ($location) {
+                      $location->update($data);
+                      $stats['updated']++;
+                  } else {
+                      $data['company_id'] = $companyId;
+                      Location::create($data);
+                      $stats['created']++;
+                  }
+              } catch (\Exception $e) {
+                  $stats['errors']++;
+                  $errors[] = ['index' => $index, 'code' => $data['code'] ?? 'unknown', 'error' => $e->getMessage()];
+              }
+          }
+
+          return response()->json([
+              'success' => true,
+              'message' => count($locations) . ' ubicaciones procesadas',
+              'data' => ['stats' => $stats, 'errors' => $errors],
+          ]);
+      }
+
+      public function destroyLocationsBatch(Request $request)
+      {
+          $request->validate(['company_id' => 'required|integer', 'codes' => 'required|array']);
+          $deleted = Location::where('company_id', $request->company_id)->whereIn('code', $request->codes)->delete();
+          return response()->json(['success' => true, 'deleted' => $deleted]);
+      }
+
+      // ======================================================
+      // PRODUCTS STOCK BATCH
+      // ======================================================
+
+      public function getProductsStock(Request $request)
+      {
+          $request->validate(['company_id' => 'required|integer']);
+          $stocks = ProductsStock::with('product:id,code,name')
+              ->where('company_id', $request->company_id)
+              ->get();
+          return response()->json(['success' => true, 'data' => $stocks]);
+      }
+
+      public function syncProductsStockBatch(Request $request)
+      {
+          $request->validate([
+              'company_id' => 'required|integer',
+              'stocks' => 'required|array|max:5000',
+              'stocks.*.store' => 'required|string|max:100',
+              'stocks.*.locations' => 'required|string|max:100',
+              'stocks.*.product_id' => 'nullable|integer',
+              'stocks.*.product_code' => 'nullable|string|max:100',
+          ]);
+
+          $stocks = $request->stocks;
+          $companyId = $request->company_id;
+          $stats = ['created' => 0, 'updated' => 0, 'errors' => 0];
+          $errors = [];
+
+          // Precargar productos por code para búsqueda eficiente
+          $productCodes = collect($stocks)
+              ->filter(fn($s) => !empty($s['product_code']))
+              ->pluck('product_code')
+              ->unique();
+          $productsByCode = [];
+          if ($productCodes->isNotEmpty()) {
+              $productsByCode = Product::whereIn('code', $productCodes)
+                  ->where('company_id', $companyId)
+                  ->pluck('id', 'code')
+                  ->toArray();
+          }
+
+          foreach ($stocks as $index => $data) {
+              try {
+                  // Resolver product_id desde product_code si es necesario
+                  if (empty($data['product_id']) && !empty($data['product_code'])) {
+                      $productId = $productsByCode[$data['product_code']] ?? null;
+                      if (!$productId) {
+                          $stats['errors']++;
+                          $errors[] = ['index' => $index, 'product_code' => $data['product_code'], 'error' => 'Producto no encontrado'];
+                          continue;
+                      }
+                      $data['product_id'] = $productId;
+                  }
+
+                  unset($data['product_code']);
+
+                  $stock = ProductsStock::where('product_id', $data['product_id'])
+                      ->where('store', $data['store'])
+                      ->where('locations', $data['locations'])
+                      ->where('company_id', $companyId)
+                      ->first();
+
+                  if ($stock) {
+                      $stock->update($data);
+                      $stats['updated']++;
+                  } else {
+                      $data['company_id'] = $companyId;
+                      ProductsStock::create($data);
+                      $stats['created']++;
+                  }
+              } catch (\Exception $e) {
+                  $stats['errors']++;
+                  $errors[] = ['index' => $index, 'error' => $e->getMessage()];
+              }
+          }
+
+          return response()->json([
+              'success' => true,
+              'message' => count($stocks) . ' stocks procesados',
+              'data' => ['stats' => $stats, 'errors' => $errors],
+          ]);
+      }
+
+      public function destroyProductsStockBatch(Request $request)
+      {
+          $request->validate([
+              'company_id' => 'required|integer',
+              'items' => 'required|array',
+              'items.*.store' => 'required|string',
+              'items.*.locations' => 'required|string',
+              'items.*.product_id' => 'nullable|integer',
+              'items.*.product_code' => 'nullable|string|max:100',
+          ]);
+
+          // Precargar productos por code
+          $productCodes = collect($request->items)
+              ->filter(fn($s) => !empty($s['product_code']))
+              ->pluck('product_code')
+              ->unique();
+          $productsByCode = [];
+          if ($productCodes->isNotEmpty()) {
+              $productsByCode = Product::whereIn('code', $productCodes)
+                  ->where('company_id', $request->company_id)
+                  ->pluck('id', 'code')
+                  ->toArray();
+          }
+
+          $deleted = 0;
+          foreach ($request->items as $item) {
+              if (empty($item['product_id']) && !empty($item['product_code'])) {
+                  $item['product_id'] = $productsByCode[$item['product_code']] ?? null;
+                  if (!$item['product_id']) continue;
+              }
+              $deleted += ProductsStock::where('product_id', $item['product_id'])
+                  ->where('store', $item['store'])
+                  ->where('locations', $item['locations'])
+                  ->where('company_id', $request->company_id)
+                  ->delete();
+          }
+
+          return response()->json(['success' => true, 'deleted' => $deleted]);
       }
   }

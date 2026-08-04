@@ -303,6 +303,21 @@ Route::middleware(['auth:sanctum'])->prefix('sync-batch')->group(function () {
     Route::delete('/sellers', [SyncController::class, 'destroySellersBatch']);
         //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_sellers');
 
+    // Store
+    Route::get('/store', [SyncController::class, 'getStores']);
+    Route::post('/store', [SyncController::class, 'syncStoresBatch']);
+    Route::delete('/store', [SyncController::class, 'destroyStoresBatch']);
+
+    // Locations
+    Route::get('/locations', [SyncController::class, 'getLocations']);
+    Route::post('/locations', [SyncController::class, 'syncLocationsBatch']);
+    Route::delete('/locations', [SyncController::class, 'destroyLocationsBatch']);
+
+    // Products Stock
+    Route::get('/products-stock', [SyncController::class, 'getProductsStock']);
+    Route::post('/products-stock', [SyncController::class, 'syncProductsStockBatch']);
+    Route::delete('/products-stock', [SyncController::class, 'destroyProductsStockBatch']);
+
     // Quotes (requiere feature sync_quotes - NO disponible en trial)
     Route::post('/quotes', [SyncController::class, 'createQuote']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_quotes');
     Route::get('/quotes', [SyncController::class, 'getQuotes']); //->middleware(\App\Http\Middleware\CheckSubscription::class . ':sync_quotes');
@@ -368,6 +383,21 @@ Route::prefix('sync-client')->middleware(['auth.acceso', 'throttle.acceso:100,1'
     Route::get('/batch/sellers', [SyncController::class, 'getSellers']);
     Route::post('/batch/sellers', [SyncController::class, 'syncSellersBatch']);
     Route::delete('/batch/sellers', [SyncController::class, 'destroySellersBatch']);
+
+    // Store
+    Route::get('/batch/store', [SyncController::class, 'getStores']);
+    Route::post('/batch/store', [SyncController::class, 'syncStoresBatch']);
+    Route::delete('/batch/store', [SyncController::class, 'destroyStoresBatch']);
+
+    // Locations
+    Route::get('/batch/locations', [SyncController::class, 'getLocations']);
+    Route::post('/batch/locations', [SyncController::class, 'syncLocationsBatch']);
+    Route::delete('/batch/locations', [SyncController::class, 'destroyLocationsBatch']);
+
+    // Products Stock
+    Route::get('/batch/products-stock', [SyncController::class, 'getProductsStock']);
+    Route::post('/batch/products-stock', [SyncController::class, 'syncProductsStockBatch']);
+    Route::delete('/batch/products-stock', [SyncController::class, 'destroyProductsStockBatch']);
 
     // Quotes
     Route::get('/batch/quotes', [SyncController::class, 'getQuotes']);

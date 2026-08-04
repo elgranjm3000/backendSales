@@ -45,6 +45,8 @@ class Product extends Model
         'buy_aliquot',
         'unidad',
         'unit',
+        'conversion_factor',
+        'unit_type',
         'main_unit',
         'allow_decimal',
         'image_type',
@@ -56,6 +58,7 @@ class Product extends Model
         'minimum_price' => 'decimal:2',
         'cost' => 'decimal:6',
         'sale_price' => 'decimal:6',
+        'conversion_factor' => 'decimal:6',
         'weight' => 'decimal:6',
         'stock' => 'decimal:6',
         'min_stock' => 'decimal:6',
@@ -86,6 +89,11 @@ class Product extends Model
     public function quoteItems(): HasMany
     {
         return $this->hasMany(QuoteItem::class);
+    }
+
+    public function stocks(): HasMany
+    {
+        return $this->hasMany(ProductsStock::class);
     }
 
     /**
