@@ -28,7 +28,9 @@ class QuoteItem extends Model
         'type_price',
         'sort_order',
         'metadata',
-        'item_type'
+        'item_type',
+        'store',
+        'locations'
     ];
 
     protected $casts = [

@@ -857,7 +857,8 @@
                   'operation_type' => $request->operation_type
               ]);
 
-              // Crear items del quote
+              // Crear items del quote y reservar stock si es ORDER
+              $isOrder = ($request->operation_type ?? 'BUDGET') === 'ORDER';
               foreach ($request->items as $item) {
                   $quote->items()->create([
                       'product_id' => $item['product_id'],
@@ -865,7 +866,7 @@
                       'item_type' => $item['item_type'] ?? 'product',
                       'unit' => $item['unit'] ?? 'pcs',
                       'quantity' => $item['quantity'],
-                      'unit_price' => $item['price'], // Mapear 'price' a 'unit_price'
+                      'unit_price' => $item['price'],
                       'discount_percentage' => $item['discount_percentage'] ?? 0,
                       'discount_amount' => $item['discount_amount'] ?? 0,
                       'tax_percentage' => $item['tax_percentage'] ?? 0,
@@ -875,7 +876,52 @@
                       'total' => $item['total'] ?? ($item['quantity'] * $item['price']),
                       'type_price' => $item['type_price'] ?? 'standard',
                       'sort_order' => $item['sort_order'] ?? 0,
+                      'store' => $item['store'] ?? '00',
+                      'locations' => $item['locations'] ?? '00',
                   ]);
+
+                  // Si es ORDER: reservar stock con conversión de unidad
+                  if ($isOrder) {
+                      $product = Product::find($item['product_id']);
+                      $quantity = (float) $item['quantity'];
+
+                      // Buscar variante correcta por code + unit
+                      $itemUnit = $item['unit'] ?? ($product->unit ?? '00');
+                      $variantProduct = Product::where('code', $product->code)
+                          ->where('unit', $itemUnit)
+                          ->where('company_id', $request->company_id)
+                          ->first();
+                      $unitType = $variantProduct->unit_type ?? $product->unit_type ?? '0';
+                      $convFactor = (float) (($variantProduct->conversion_factor ?: $product->conversion_factor) ?: 1);
+                      $realProductId = $variantProduct->id ?? $product->id;
+
+                      $committedAmount = match($unitType) {
+                          '0' => $quantity,
+                          '1' => $quantity * $convFactor,
+                          '2' => $quantity / $convFactor,
+                          default => $quantity,
+                      };
+
+                      $stock = ProductsStock::where('product_id', $realProductId)
+                          ->where('store', $item['store'] ?? '00')
+                          ->where('locations', $item['locations'] ?? '00')
+                          ->where('company_id', $request->company_id)
+                          ->first();
+
+                      if ($stock) {
+                          $stock->committed_stock += $committedAmount;
+                          $stock->save();
+                      } else {
+                          ProductsStock::create([
+                              'product_id' => $realProductId,
+                              'store' => $item['store'] ?? '00',
+                              'locations' => $item['locations'] ?? '00',
+                              'company_id' => $request->company_id,
+                              'stock' => 0,
+                              'committed_stock' => $committedAmount,
+                          ]);
+                      }
+                  }
               }
           });
 
@@ -1273,6 +1319,7 @@
           if ($productCodes->isNotEmpty()) {
               $productsByCode = Product::whereIn('code', $productCodes)
                   ->where('company_id', $companyId)
+                   ->where('main_unit', '1')
                   ->pluck('id', 'code')
                   ->toArray();
           }

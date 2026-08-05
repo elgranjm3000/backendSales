@@ -41,6 +41,28 @@ class ProductController extends Controller
                    ->orderByRaw('LOWER(name) ASC')
                    ->paginate($perPage);
 
+          // Obtener stock por tienda/ubicación para cada producto (evitar N+1)
+          $productIds = collect($paginated->items())->pluck('id')->unique();
+          $stocksByProductId = [];
+          if ($productIds->isNotEmpty()) {
+              $stockData = \App\Models\ProductsStock::whereIn('product_id', $productIds)
+                  ->when($request->company_id, fn($q) => $q->where('company_id', $request->company_id))
+                  ->get();
+              $stocksByProductId = $stockData->groupBy('product_id')->map(function ($items) {
+                  $grouped = [];
+                  foreach ($items as $s) {
+                      $available = $s->stock - $s->committed_stock;
+                      $grouped[$s->store][$s->locations] = [
+                          'stock' => $s->stock,
+                          'ordered_stock' => $s->ordered_stock,
+                          'committed_stock' => $s->committed_stock,
+                          'available' => $available,
+                      ];
+                  }
+                  return $grouped;
+              });
+          }
+
           // Obtener todas las unidades disponibles para cada código (evitar N+1)
           $productCodes = collect($paginated->items())->pluck('code')->unique();
           $allUnitsByCode = [];
@@ -48,7 +70,7 @@ class ProductController extends Controller
               $units = Product::whereIn('code', $productCodes)
                   ->where('status', 'active')
                   ->when($request->company_id, fn($q) => $q->byCompany($request->company_id))
-                  ->select('code', 'unit', 'unidad', 'price', 'cost', 'higher_price', 'minimum_price')
+                  ->select('code', 'unit', 'unidad', 'price', 'cost', 'higher_price', 'minimum_price', 'conversion_factor', 'unit_type')
                   ->get();
               $allUnitsByCode = $units->groupBy('code')->map(fn($items) => $items->map(fn($unit) => [
                   'unit' => $unit->unit,
@@ -57,11 +79,13 @@ class ProductController extends Controller
                   'cost' => (string) $unit->cost,
                   'higher_price' => (string) $unit->higher_price,
                   'minimum_price' => (string) $unit->minimum_price,
+                  'conversion_factor' => (string) $unit->conversion_factor,
+                  'unit_type' => $unit->unit_type,
               ])->values()->toArray());
           }
 
             // Convertir a colección y agregar image_url y available_units
-         $products = collect($paginated->items())->map(function ($product) use ($allUnitsByCode) {
+         $products = collect($paginated->items())->map(function ($product) use ($allUnitsByCode, $stocksByProductId) {
                     // 1. Extraemos los bytes del recurso de PostgreSQL si es que viene como un resource de PHP
                     $binaryData = $product->product_image;
                     if (is_resource($binaryData)) {
@@ -93,7 +117,12 @@ class ProductController extends Controller
                         'cost' => (string) $product->cost,
                         'higher_price' => (string) $product->higher_price,
                         'minimum_price' => (string) $product->minimum_price,
+                        'conversion_factor' => (string) $product->conversion_factor,
+                        'unit_type' => $product->unit_type,
                     ]];
+
+                    // 5. Agregar stock por tienda/ubicación
+                    $productArray['stocks'] = $stocksByProductId[$product->id] ?? [];
 
                     return $productArray;
         });

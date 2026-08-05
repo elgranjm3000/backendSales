@@ -121,6 +121,8 @@ class QuoteController extends Controller
           'items.*.quantity' => 'required|numeric|min:0',
           'items.*.unit_price' => 'required|numeric|min:0',
           'items.*.buy_tax' => 'required|in:0,1',
+          'items.*.store' => 'nullable|string|max:100',
+          'items.*.locations' => 'nullable|string|max:100',
           'valid_until' => 'nullable|date|after:today',
           'terms_conditions' => 'nullable|string',
           'notes' => 'nullable|string',
@@ -228,10 +230,15 @@ class QuoteController extends Controller
 
           $quote = Quote::create($quoteData);
 
-          // ✨ PASO 8: Crear items con los mismos cálculos
+          // ✨ PASO 8: Crear items y reservar stock si es ORDER
+          $isOrder = ($request->operation_type ?? 'BUDGET') === 'ORDER';
           foreach ($request->items as $index => $item) {
               // Obtener datos del producto si no se proporcionan
-              $product = \App\Models\Product::find($item['product_id']);
+
+              $products = \App\Models\Product::where('code', $item['code'])
+                      ->where('unit', $item['unit'])
+                      ->where('company_id', $request->company_id)
+                      ->first();
 
               // CÁLCULOS IDENTICOS AL PRIMER LOOP
               $itemSubtotal = round($item['quantity'] * $item['unit_price'], 2);
@@ -240,16 +247,15 @@ class QuoteController extends Controller
               $itemSubtotalAfterDiscount = round($itemSubtotal - $itemDiscount, 2);
 
               $itemTaxAmount = 0;
-              $aliquot = $item['aliquot'] ?? ($product->aliquot ?? 0);
+              $aliquot = $item['aliquot'] ?? ($products->aliquot ?? 0);
               if ($item['buy_tax'] != 1) {
-                  // ✅ CORREGIDO: Calcular IVA sobre el subtotal CON DESCUENTO
                   $itemTaxAmount = round($itemSubtotalAfterDiscount * ($aliquot / 100), 2);
               }
 
               $itemTotal = round($itemSubtotalAfterDiscount + $itemTaxAmount, 2);
 
               $quote->items()->create([
-                  'product_id' => $item['product_id'],
+                  'product_id' => $products->id ?? $item['product_id'],
                   'quantity' => $item['quantity'],
                   'unit_price' => $item['unit_price'],
                   'total' => $itemTotal,
@@ -265,7 +271,44 @@ class QuoteController extends Controller
                   'unit' => $item['unit'] ?? 'pcs',
                   'sort_order' => $index + 1,
                   'subtotal' => $itemSubtotal,
+                  'store' => $item['store'] ?? '00',
+                  'locations' => $item['locations'] ?? '00',
               ]);
+
+              // Si es ORDER: reservar stock con conversión de unidad
+              if ($isOrder) {
+                  $quantity = (float) $item['quantity'];
+                  $unitType = $products->unit_type ?? '0';
+                  $convFactor = (float) (($products->conversion_factor ?: 1));
+                  $realProductId = $products->id ?? $products->id;
+
+                  $committedAmount = match($unitType) {
+                      '0' => $quantity,
+                      '1' => $quantity * $convFactor,
+                      '2' => $quantity / $convFactor,
+                      default => $quantity,
+                  };
+
+                  $stock = \App\Models\ProductsStock::where('product_id', $item['product_id'])
+                      ->where('store', $item['store'] ?? '00')
+                      ->where('locations', $item['locations'] ?? '00')
+                      ->where('company_id', $request->company_id)
+                      ->first();
+
+                  if ($stock) {
+                      $stock->committed_stock += $committedAmount;
+                      $stock->save();
+                  } else {
+                      \App\Models\ProductsStock::create([
+                          'product_id' => $realProductId,
+                          'store' => $item['store'] ?? '00',
+                          'locations' => $item['locations'] ?? '00',
+                          'company_id' => $request->company_id,
+                          'stock' => 0,
+                          'committed_stock' => $committedAmount,
+                      ]);
+                  }
+              }
           }
 
           DB::commit();
@@ -282,6 +325,8 @@ class QuoteController extends Controller
                   'discount_amount' => $discountAmount,
                   'tax_amount' => $totalTaxAmount,
                   'total' => $total,
+                 
+                 
               ]
           ], 201);
 
